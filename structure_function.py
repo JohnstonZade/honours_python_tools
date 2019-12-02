@@ -1,7 +1,9 @@
 '''Code to calculate structure function of a fluid simulation.'''
 # Change to athena_read dir
 import sys
-sys.path.insert(1, '/home/zade/athena/vis/python')
+#sys.path.insert(1, '/home/zade/athena/vis/python')
+# Thunderbird
+sys.path.insert(1, 'nfs_physics/users/stud/johza721/athena/vis/python') 
 from athena_read import athdf
 import numpy as np
 from numpy.random import randint, random
@@ -73,8 +75,10 @@ def get_l_perp(L1, L2, l, B):
     cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
     θ = np.array([0, 15, 30, 45, 60, 75, 90])
     θlen = len(θ) - 1
+    # Have to reverse to preserve inequality direction in select_y.
     cos_θ = np.cos((np.pi/180)*θ)[::-1]
     l_sel = np.array([select_y(cθ, cos_θ, get_mag(l), i) for i in range(θlen)])
+    # Have to reverse again to align with theta values
     return θ, l_sel[::-1]
 
 
@@ -164,7 +168,8 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # using both average velocity at each pair of points
     # and average B field at each pair of points (12 total)
     if do_mhd:
-        θ, ll = get_l_perp(L1, L2, l_vec, B_data)
+        θ, l_B_bin = get_l_perp(L1, L2, l_vec, B_data)
+        l_par = l_B_bin[0 <=]
     # Also, get the new distribution of l's to put in write up
 
     L = np.max(get_length())
