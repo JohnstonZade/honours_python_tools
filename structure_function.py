@@ -95,6 +95,18 @@ def structure_function(filename, n, N_p=1e6, do_ldist=0, do_plot=0):
     # Find distance between each pair of points
     l_mag = get_mag(l_vec)
     print('Distances calculated')
+    
+    # MHD: Get magnetic field components
+    # Get l and B unit vectors then get 
+    # cos(theta) = l dot b
+    # bin with theta = [0, 15, 30, 45, 60, 75, 90]
+    # 0-15 is k_parallel
+    # 45-90 is k_perp
+    # display structure function for each bin (eg 0-15)
+    # using both average velocity at each pair of points
+    # and average B field at each pair of points (12 total)
+    
+    # Also, get the new distribution of l's to put in write up
 
     # Check distribution of l's
     if do_ldist:
