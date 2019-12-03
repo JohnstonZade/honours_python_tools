@@ -4,7 +4,7 @@ import sys
 #sys.path.insert(1, '/home/zade/athena/vis/python')
 # Thunderbird
 sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
-from athena_read import athdf
+from athena_read import athdf  # no h5py on thunderbird
 import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
