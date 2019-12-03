@@ -3,7 +3,7 @@
 import sys
 #sys.path.insert(1, '/home/zade/athena/vis/python')
 # Thunderbird
-sys.path.insert(1, 'nfs_physics/users/stud/johza721/athena/vis/python') 
+sys.path.insert(1, 'nfs_physics/users/stud/johza721/athena/vis/python')
 from athena_read import athdf
 import numpy as np
 from numpy.random import randint, random
@@ -103,6 +103,18 @@ def calc_struct(L1, L2, v, l_mag, L_max):
     return l_grid, Δv_avg
 
 
+def plot_MHD(l, titles, vels, Bs, fname):
+    for i in range(len(titles)):
+        plt.subplot(3, 2, i+1)
+        plt.loglog(l, vels[i], l, Bs[i], l, l**(2/3))
+        plt.title(r'$S_2(l)$ with' + titles[i])
+        plt.xlabel(r'log($l$)')
+        plt.ylabel('log Structure Function')
+        plt.legend(['Velocity Structure Function', 'B-field Structure Function',
+                    r'$l^{2/3}$'])
+    plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
+
+
 def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     '''Calculates and plots structure function.
     Takes about 20s for a 128 cube grid file with 1 million random pairs.
@@ -122,9 +134,13 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Read in data and set up grid
-    # filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-    # filename += 'hydro_cont_turb_128/Turb.out2.00030.athdf'
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+
+    # Seagate
+    # folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+
+    # Thunderbird
+    folder = '/data/johza721/output/MHDTurb/'
+    # Input
     folder += filename + '/Turb'  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = fname(n)
@@ -149,6 +165,7 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     l_vec = x1_vec - x2_vec
     # Find distance between each pair of points
     l_mag = get_mag(l_vec)
+    L = np.max(get_length())
 
     # Check distribution of l's
     if do_ldist:
@@ -169,12 +186,21 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # and average B field at each pair of points (12 total)
     if do_mhd:
         θ, l_B_bin = get_l_perp(L1, L2, l_vec, B_data)
-        l_par = l_B_bin[0 <=]
-    # Also, get the new distribution of l's to put in write up
-
-    L = np.max(get_length())
-    v = vel_data  # get one for B_data
-    l_grid, Δv_avg = calc_struct(L1, L2, v, l_mag, L)
+        # θ_grid = 0.5*(θ[:-1] + θ[1:])
+        # l_par = l_B_bin[0]  # 0 - 15 degrees
+        # l_perp = l_B_bin[3:]  # 45 - 90 degrees
+        titles = []
+        vels = []
+        Bs = []
+        l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
+        for i, l_B in enumerate(l_B_bin):
+            titles.append(str(θ[i]) + '<= θ <' + str(θ[i+1]))
+            vels.append(calc_struct(L1, L2, vel_data, l_B, L)[1])
+            Bs.append(calc_struct(L1, L2, B_data, l_B, L)[1])
+        plot_MHD(l_grid, titles, vels, Bs)
+        return None
+    else:
+        l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
 
     if do_plot:
         plt.loglog(l_grid, Δv_avg, l_grid, l_grid**(2/3))
@@ -187,4 +213,5 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         return l_grid, Δv_avg, t
 
 
-structure_function('hydro_cont_turb_128', 30, do_ldist=1, do_plot=1)
+# structure_function('hydro_cont_turb_128', 30, do_ldist=1, do_plot=1)
+structure_function('mhd_cont_turb_128', 30, do_mhd=1)
