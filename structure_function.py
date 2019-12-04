@@ -1,9 +1,9 @@
 '''Code to calculate structure function of a fluid simulation.'''
 # Change to athena_read dir
 import sys
-#sys.path.insert(1, '/home/zade/athena/vis/python')
+sys.path.insert(1, '/home/zade/athena/vis/python')
 # Thunderbird
-sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
+# sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
 from athena_read import athdf  # no h5py on thunderbird
 import numpy as np
 from numpy.random import randint, random
@@ -73,13 +73,14 @@ def get_l_perp(L1, L2, l, B):
 
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
+    θ_data = np.arccos(cθ)
     θ = np.array([0, 15, 30, 45, 60, 75, 90])
     θlen = len(θ) - 1
-    # Have to reverse to preserve inequality direction in select_y.
-    cos_θ = np.cos((np.pi/180)*θ)[::-1]
-    l_sel = np.array([select_y(cθ, cos_θ, get_mag(l), i) for i in range(θlen)])
-    # Have to reverse again to align with theta values
-    return θ, l_sel[::-1]
+    θ_rad = (np.pi/180)*θ
+
+    l_sel = np.array([select_y(θ_data, θ_rad, get_mag(l), i) for i in range(θlen)])
+
+    return θ, l_sel
 
 
 def calc_struct(L1, L2, v, l_mag, L_max):
@@ -99,23 +100,28 @@ def calc_struct(L1, L2, v, l_mag, L_max):
     l_bin = np.logspace(np.log10(2*L_max/N_l), np.log10(L_max/2), N_l+1)
     l_grid = 0.5*(l_bin[:-1] + l_bin[1:])
     Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i) for i in range(N_l)])
-
+    print('Structure Function Calculated')
     return l_grid, Δv_avg
 
 
 def plot_MHD(l, titles, vels, Bs, fname):
     for i in range(len(titles)):
-        plt.subplot(3, 2, i+1)
+        # plt.subplot(3, 2, i+1)
         plt.loglog(l, vels[i], l, Bs[i], l, l**(2/3))
-        plt.title(r'$S_2(l)$ with' + titles[i])
+        plt.title(r'$S_2(l)$ with ' + titles[i])
         plt.xlabel(r'log($l$)')
         plt.ylabel('log Structure Function')
         plt.legend(['Velocity Structure Function', 'B-field Structure Function',
                     r'$l^{2/3}$'])
-    plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
+        plt.savefig('/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+                    + fname + '_' + str(i) + '.png')
+        plt.clf()
+    print('Plotted')
+    # plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
 
 
-def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
+
+def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     '''Calculates and plots structure function.
     Takes about 20s for a 128 cube grid file with 1 million random pairs.
     '''
@@ -130,25 +136,27 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         tp = tuple(p)
         return np.array([zz[tp], yy[tp], xx[tp]])
 
-    def fname(n):
+    def f(n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Read in data and set up grid
 
     # Seagate
-    # folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+    if do_mhd:
+        folder += 'MHD/'
 
     # Thunderbird
-    folder = '/data/johza721/output/MHDTurb/'
+    # folder = '/data/johza721/output/MHDTurb/'
     # Input
-    folder += filename + '/Turb'  # Name of output
+    folder += fname + '/Turb'  # Name of output
     output_id = '2'  # Output ID (set in input file)
-    filename = fname(n)
+    filename = f(n)
     data = athdf(filename)
 
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
-    t = '{:.3f}'.format(data['Time']) + ' s'
+    t = '{:.1f}'.format(data['Time']) + ' s'
 
     zz, yy, xx = np.meshgrid(data['x3f'], data['x2f'], data['x1f'],
                              indexing='ij')
@@ -157,6 +165,7 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
 
     L1, L2 = generate_points(grid, N)
+    print('Generated points')
 
     # Get actual position vector components for each pair of grid points
     # and difference vector between them
@@ -166,6 +175,7 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # Find distance between each pair of points
     l_mag = get_mag(l_vec)
     L = np.max(get_length())
+    print('Lengths calculated')
 
     # Check distribution of l's
     if do_ldist:
@@ -186,18 +196,17 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # and average B field at each pair of points (12 total)
     if do_mhd:
         θ, l_B_bin = get_l_perp(L1, L2, l_vec, B_data)
-        # θ_grid = 0.5*(θ[:-1] + θ[1:])
-        # l_par = l_B_bin[0]  # 0 - 15 degrees
-        # l_perp = l_B_bin[3:]  # 45 - 90 degrees
-        titles = []
-        vels = []
-        Bs = []
+
+        titles, vels, Bs = [], [], []
         l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
         for i, l_B in enumerate(l_B_bin):
-            titles.append(str(θ[i]) + '<= θ <' + str(θ[i+1]))
+            titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
+                          + str(θ[i+1]) +r'$^\circ$')
             vels.append(calc_struct(L1, L2, vel_data, l_B, L)[1])
             Bs.append(calc_struct(L1, L2, B_data, l_B, L)[1])
-        plot_MHD(l_grid, titles, vels, Bs)
+            print((i+1)/len(l_B_bin)*100)
+        print('Plotting')
+        plot_MHD(l_grid, titles, vels, Bs, fname)
         return None
     else:
         l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
@@ -214,4 +223,4 @@ def structure_function(filename, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
 
 
 # structure_function('hydro_cont_turb_128', 30, do_ldist=1, do_plot=1)
-structure_function('mhd_cont_turb_128', 30, do_mhd=1)
+structure_function('mhd_cont_turb_128', 8, N=1e4, do_mhd=1, do_ldist=1, do_plot=0)
