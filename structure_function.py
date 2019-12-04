@@ -228,5 +228,4 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         return l_grid, Δv_avg, t
 
 
-# structure_function('hydro_cont_turb_128', 30, do_ldist=1, do_plot=1)
-structure_function('mhd_cont_turb_128', 8, do_mhd=1, do_ldist=1, do_plot=1)
+# structure_function('mhd_cont_turb_128', 8, do_mhd=1, do_ldist=1, do_plot=1)
