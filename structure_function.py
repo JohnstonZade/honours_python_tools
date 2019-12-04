@@ -39,17 +39,22 @@ def get_vec(v, p):
     return np.array([v1, v2, v3])
 
 
-def select_y(x, x_bin, y, i):
+def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
     '''Selects and averages the y vector values with the condition that
-    the corresponding x values satisfy x_bin[i] <= x <= x_bin[i+1}].
+    the corresponding x values satisfy x_bin[i] <= x <= x_bin[i+1].
     '''
-    x_logic = np.where(np.logical_and(x_bin[i] <= x, x < x_bin[i+1]))
-    return y[x_logic]
+    if use_mask:
+        x = x[mask]
+        y = y[mask]
+    assert i < len(x_bin)-1, 'Can\'t access element at len(x_bin)'
+    x_mask = np.logical_and(x_bin[i] <= x, x < x_bin[i+1])
+
+    return x_mask if return_mask else y[x_mask]
 
 
-def get_mean(x, x_bin, y, i):
+def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
     '''Calculate the mean of the selection.'''
-    y_sel = select_y(x, x_bin, y, i)
+    y_sel = select_y(x, x_bin, y, i, mask, use_mask)
 
     # Stops error for mean of empty slice
     # Might be a better way to handle this
@@ -74,16 +79,16 @@ def get_l_perp(L1, L2, l, B):
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
     θ_data = np.arccos(cθ)
-    θ = np.array([0, 15, 30, 45, 60, 75, 90])
+    θ = np.linspace(0, 90, 7, endpoint=True)  # 7 default
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
-    l_sel = np.array([select_y(θ_data, θ_rad, get_mag(l), i) for i in range(θlen)])
+    l_mask = [select_y(θ_data, θ_rad, get_mag(l), i, return_mask=1)
+              for i in range(θlen)]
+    return θ, l_mask
 
-    return θ, l_sel
 
-
-def calc_struct(L1, L2, v, l_mag, L_max):
+def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     # For each pair of position vectors x1, x2
     # Get velocity/Bfield vectors v1, v2 at each point
     # Calculate Δv2 = abs(v1 - v2)**2
@@ -99,7 +104,9 @@ def calc_struct(L1, L2, v, l_mag, L_max):
     N_l = 30
     l_bin = np.logspace(np.log10(2*L_max/N_l), np.log10(L_max/2), N_l+1)
     l_grid = 0.5*(l_bin[:-1] + l_bin[1:])
-    Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i) for i in range(N_l)])
+    Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i, mask, use_mask)
+                       for i in range(N_l)])
+
     print('Structure Function Calculated')
     return l_grid, Δv_avg
 
@@ -110,15 +117,14 @@ def plot_MHD(l, titles, vels, Bs, fname):
         plt.loglog(l, vels[i], l, Bs[i], l, l**(2/3))
         plt.title(r'$S_2(l)$ with ' + titles[i])
         plt.xlabel(r'log($l$)')
-        plt.ylabel('log Structure Function')
-        plt.legend(['Velocity Structure Function', 'B-field Structure Function',
+        plt.ylabel(r'log($S_2(l)$))')
+        plt.legend(['Vel Structure Function', 'B-field Structure Function',
                     r'$l^{2/3}$'])
         plt.savefig('/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
                     + fname + '_' + str(i) + '.png')
         plt.clf()
-    print('Plotted')
+    print('Plotted MHD')
     # plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
-
 
 
 def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
@@ -195,27 +201,27 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # using both average velocity at each pair of points
     # and average B field at each pair of points (12 total)
     if do_mhd:
-        θ, l_B_bin = get_l_perp(L1, L2, l_vec, B_data)
+        θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
 
         titles, vels, Bs = [], [], []
         l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
-        for i, l_B in enumerate(l_B_bin):
+        for i, l_m in enumerate(l_mask):
             titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
-                          + str(θ[i+1]) +r'$^\circ$')
-            vels.append(calc_struct(L1, L2, vel_data, l_B, L)[1])
-            Bs.append(calc_struct(L1, L2, B_data, l_B, L)[1])
-            print((i+1)/len(l_B_bin)*100)
-        print('Plotting')
+                          + str(θ[i+1]) +r'$^\circ$' + ' at t = ' + t)
+            vels.append(calc_struct(L1, L2, vel_data, l_mag, L, l_m, 1)[1])
+            Bs.append(calc_struct(L1, L2, B_data, l_mag, L, l_m, 1)[1])
+            print('{:.2f}'.format((i+1)/len(l_mask)*100) + '% done')
+        print('Plotting MHD')
         plot_MHD(l_grid, titles, vels, Bs, fname)
-        return None
-    else:
-        l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
+
+    print('Calculating full velocity structure function')
+    l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
 
     if do_plot:
         plt.loglog(l_grid, Δv_avg, l_grid, l_grid**(2/3))
         plt.title(r'$S_2(l)$ at $t=$ ' + t)
         plt.xlabel(r'log($l$)')
-        plt.ylabel('log Structure Function')
+        plt.ylabel(r'log($S_2(l)$))')
         plt.legend(['Structure Function', r'$l^{2/3}$'])
         plt.show()
     else:
@@ -223,4 +229,4 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
 
 
 # structure_function('hydro_cont_turb_128', 30, do_ldist=1, do_plot=1)
-structure_function('mhd_cont_turb_128', 8, N=1e4, do_mhd=1, do_ldist=1, do_plot=0)
+structure_function('mhd_cont_turb_128', 8, do_mhd=1, do_ldist=1, do_plot=1)
