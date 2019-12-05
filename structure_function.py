@@ -121,7 +121,7 @@ def plot_MHD(l, titles, vels, Bs, fname):
         plt.legend(['Vel Structure Function', 'B-field Structure Function',
                     r'$l^{2/3}$'])
         plt.savefig('/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-                    + fname + '_' + str(i) + '.png')
+                    + 'figs/' + fname + '_' + str(i) + '.png')
         plt.clf()
     print('Plotted MHD')
     # plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
@@ -149,8 +149,6 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
 
     # Seagate
     folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-    if do_mhd:
-        folder += 'MHD/'
 
     # Thunderbird
     # folder = '/data/johza721/output/MHDTurb/'
@@ -226,6 +224,3 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
         plt.show()
     else:
         return l_grid, Δv_avg, t
-
-
-# structure_function('mhd_cont_turb_128', 8, do_mhd=1, do_ldist=1, do_plot=1)

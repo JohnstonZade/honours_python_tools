@@ -24,9 +24,9 @@ fig, ax = plt.subplots()
 line1, = plt.loglog([], [])
 line2, = plt.loglog([], [])
 
-fname = 'hydro_cont_turb_128'
-max_n = 40
+fname = 'mhd_cont_turb_48'
+max_n = 200
 
 ani = animation.FuncAnimation(fig, animate, range(max_n), blit=True,
-                              interval=500, repeat_delay=2000)
+                              repeat_delay=2000)
 ani.save('animate/'+fname+'.gif')
