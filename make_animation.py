@@ -1,9 +1,12 @@
+import sys
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from structure_function import structure_function
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
+N = 1e5
+fname = str(sys.argv[1])
 
 def animate(n):
     print('n =', n)
@@ -24,7 +27,7 @@ fig, ax = plt.subplots()
 line1, = plt.loglog([], [])
 line2, = plt.loglog([], [])
 
-fname = 'mhd_cont_turb_48'
+# fname = 'cgl_cont_turb_6432'
 max_n = 200
 
 ani = animation.FuncAnimation(fig, animate, range(max_n), blit=True,
