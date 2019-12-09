@@ -1,35 +1,54 @@
 import sys
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+import imageio
+import glob
+import os
+from natsort import natsorted
 from structure_function import structure_function
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
-N = 1e5
 fname = str(sys.argv[1])
-
-def animate(n):
-    print('n =', n)
-    l, u, t = structure_function(fname, n)
-
-    line1.set_data(l, u)
-    line2.set_data(l, l**(2/3))
-    ax.relim()
-    ax.autoscale_view()
-    plt.title(r"Structure Function at $t=$ " + t)
-    plt.xlabel(r'log($l$)')
-    plt.ylabel('log Structure Function')
-    plt.legend(['Structure Function', r'$l^{2/3}$'])
-    return line1, line2
-
-
-fig, ax = plt.subplots()
-line1, = plt.loglog([], [])
-line2, = plt.loglog([], [])
-
-# fname = 'cgl_cont_turb_6432'
+mhd = 'mhd' in fname or 'cgl' in fname
 max_n = 200
+filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+filename += 'figs/' + fname
 
-ani = animation.FuncAnimation(fig, animate, range(max_n), blit=True,
-                              repeat_delay=2000)
-ani.save('animate/'+fname+'.gif')
+for n in range(max_n+1):
+    print('n =', n)
+    structure_function(fname, n, do_mhd=mhd)
+
+
+def animate_struct():
+    struct = natsorted(glob.glob(filename + '/struct*.png'))
+    struct_ims = []
+
+    for image in struct:
+        struct_ims.append(imageio.imread(image))
+
+    imageio.mimsave('animate/' + fname + '_struct.gif', struct_ims,
+                    duration=0.2)
+
+
+def animate_mhd():
+    parl = natsorted(glob.glob(filename + '/*0.png'))
+    # Figure out way to get end index depending on number of angles
+    perp = natsorted(glob.glob(filename + '/*2.png'))
+    parl_ims, perp_ims = [], []
+
+    for image in parl:
+        parl_ims.append(imageio.imread(image))
+    for image in perp:
+        perp_ims.append(imageio.imread(image))
+
+    imageio.mimsave('animate/' + fname + '_parl.gif', parl_ims,
+                    duration=0.2)
+    imageio.mimsave('animate/' + fname + '_perp.gif', perp_ims,
+                    duration=0.2)
+
+
+animate_struct()
+if mhd:
+    animate_mhd()
+
+for image in glob.glob(filename + '/*.png'):
+    os.remove(image)

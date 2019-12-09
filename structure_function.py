@@ -4,6 +4,7 @@ import sys
 sys.path.insert(1, '/home/zade/athena/vis/python')
 # Thunderbird
 # sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
+import os
 from athena_read import athdf  # no h5py on thunderbird
 import numpy as np
 from numpy.random import randint, random
@@ -42,7 +43,11 @@ def get_vec(v, p):
 def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
     '''Selects and averages the y vector values with the condition that
     the corresponding x values satisfy x_bin[i] <= x <= x_bin[i+1].
+
+    If a mask is provided, it is used on both x and y so that the order of
+    the elements is unchanged when selecting based on x_bin.
     '''
+
     if use_mask:
         x = x[mask]
         y = y[mask]
@@ -79,7 +84,7 @@ def get_l_perp(L1, L2, l, B):
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
     θ_data = np.arccos(cθ)
-    θ = np.linspace(0, 90, 7, endpoint=True)  # 7 default
+    θ = np.linspace(0, 90, 4, endpoint=True)  # 7 default
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
@@ -111,7 +116,15 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     return l_grid, Δv_avg
 
 
-def plot_MHD(l, titles, vels, Bs, fname):
+def plot_MHD(l, t, titles, vels, Bs, fname):
+    # Check whether folder to save exists
+    # Seagate
+    filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'\
+                + 'figs/' + fname
+
+    if not os.path.exists(filename):
+        os.makedirs(filename)
+
     for i in range(len(titles)):
         # plt.subplot(3, 2, i+1)
         plt.loglog(l, vels[i], l, Bs[i], l, l**(2/3))
@@ -120,14 +133,28 @@ def plot_MHD(l, titles, vels, Bs, fname):
         plt.ylabel(r'log($S_2(l)$))')
         plt.legend(['Vel Structure Function', 'B-field Structure Function',
                     r'$l^{2/3}$'])
-        plt.savefig('/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-                    + 'figs/' + fname + '_' + str(i) + '.png')
+        plt.savefig(filename + '/t' + t + '_' + str(i) + '.png')
         plt.clf()
     print('Plotted MHD')
-    # plt.savefig('/data/johza721/output/MHDTurb/' + fname + '.png')
 
 
-def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
+def plot_struct(l_grid, v_avg, t, fname):
+    filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'\
+                + 'figs/' + fname
+
+    if not os.path.exists(filename):
+        os.makedirs(filename)
+
+    plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3))
+    plt.title(r'$S_2(l)$ at $t=$ ' + t)
+    plt.xlabel(r'log($l$)')
+    plt.ylabel(r'log($S_2(l)$))')
+    plt.legend(['Structure Function', r'$l^{2/3}$'])
+    plt.savefig(filename + '/struct_t' + t + '.png')
+    plt.clf()
+
+
+def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
     '''Calculates and plots structure function.
     Takes about 20s for a 128 cube grid file with 1 million random pairs.
     '''
@@ -149,6 +176,8 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
 
     # Seagate
     folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+    if do_mhd:
+        folder += 'MHD/'
 
     # Thunderbird
     # folder = '/data/johza721/output/MHDTurb/'
@@ -200,27 +229,20 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0, do_plot=0):
     # and average B field at each pair of points (12 total)
     if do_mhd:
         θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
-
         titles, vels, Bs = [], [], []
         l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
+
         for i, l_m in enumerate(l_mask):
             titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
-                          + str(θ[i+1]) +r'$^\circ$' + ' at t = ' + t)
+                          + str(θ[i+1]) + r'$^\circ$' + ' at t = ' + t)
             vels.append(calc_struct(L1, L2, vel_data, l_mag, L, l_m, 1)[1])
             Bs.append(calc_struct(L1, L2, B_data, l_mag, L, l_m, 1)[1])
             print('{:.2f}'.format((i+1)/len(l_mask)*100) + '% done')
+
         print('Plotting MHD')
-        plot_MHD(l_grid, titles, vels, Bs, fname)
+        plot_MHD(l_grid, t, titles, vels, Bs, fname)
 
     print('Calculating full velocity structure function')
     l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
-
-    if do_plot:
-        plt.loglog(l_grid, Δv_avg, l_grid, l_grid**(2/3))
-        plt.title(r'$S_2(l)$ at $t=$ ' + t)
-        plt.xlabel(r'log($l$)')
-        plt.ylabel(r'log($S_2(l)$))')
-        plt.legend(['Structure Function', r'$l^{2/3}$'])
-        plt.show()
-    else:
-        return l_grid, Δv_avg, t
+    print('Plotting Struct')
+    plot_struct(l_grid, Δv_avg, t, fname)
