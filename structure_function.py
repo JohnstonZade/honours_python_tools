@@ -24,6 +24,7 @@ def generate_points(grid, N):
     N_p = int(N)
     L1 = randint(0, grid, size=(N_p, len(grid)))
     # Generate second set of random points to bias closer to points in L1
+    # Higher values of r_pow give a smaller bias
     r_pow = 6
     L2 = L1 + np.ceil(grid*random(size=(N_p, len(grid)))**r_pow).astype(int)
     # Ensure points are in the grid
@@ -104,7 +105,7 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     Δv_mag2 = get_mag(Δv_vec)**2
 
     # Bin and plot structure function
-    # Plot in the middle of the grid points otherwise the size of arrays
+    # Plot in the middle of the bin points otherwise the size of arrays
     # won't match up.
     N_l = 30
     l_bin = np.logspace(np.log10(2*L_max/N_l), np.log10(L_max/2), N_l+1)

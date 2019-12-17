@@ -3,15 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 from structure_function import load_data
-# rc('text', usetex=True)  # LaTeX labels
+rc('text', usetex=True)  # LaTeX labels
 
 
-# FIX:
+# FIX: Find a way to get perpendicular vector components
 # Assumes that B_0 is always in the x-direction
 def get_rms(fname, n, do_mhd):
     data = load_data(fname, n)
     t = data['Time']
-    # Get perpendicullar direction from initial conditions?
+
+    # Get perpendicular direction from initial conditions?
     vy, vz = data['vel2'], data['vel3']
     vel_perp_2 = (vy-np.mean(vy))**2 + (vz-np.mean(vz))**2
     if do_mhd:
@@ -37,14 +38,12 @@ def plot_rms(fname, do_mhd=1):
 
     plt.plot(T, V, T, B)
     # plt.plot(T, 0.5*np.ones(len(T)), ':')
-    plt.plot(T, np.mean(B)*np.ones(len(T)), ':', T, np.mean(V)*np.ones(len(T)), ':')
+    plt.plot(T, np.mean(V)*np.ones(len(T)), ':',
+             T, np.mean(B)*np.ones(len(T)), ':')
     plt.title('Time Evolution of Perpendicular Fluctuations (RMS)')
     plt.xlabel('Time (s)')
     plt.ylabel(r'$\delta_{\perp \textrm{, rms}}$')
     plt.legend([r'$\delta u_{\perp}$', r'$\delta B_{\perp}$',
                 r'$\delta u_{\perp}$ mean', r'$\delta B_{\perp}$ mean'])
-    plt.show()
-
-
-fname = 'MHD/cgl_cont_turb_12864'
-plot_rms(fname)
+    plt.savefig('animate/' + fname + '/' + fname + '_fluc.png')
+    plt.clf()
