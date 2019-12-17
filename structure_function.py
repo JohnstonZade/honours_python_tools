@@ -127,15 +127,33 @@ def plot_MHD(l, t, titles, vels, Bs, fname):
 
     for i in range(len(titles)):
         # plt.subplot(3, 2, i+1)
-        plt.loglog(l, vels[i], l, Bs[i], l, l**(2/3))
+        plt.loglog(l, vels[i], l, Bs[i])
+        plt.loglog(l, l**(2/3), ':', l, l, ':')
         plt.title(r'$S_2(l)$ with ' + titles[i])
         plt.xlabel(r'log($l$)')
         plt.ylabel(r'log($S_2(l)$))')
         plt.legend(['Vel Structure Function', 'B-field Structure Function',
-                    r'$l^{2/3}$'])
+                    r'$l^{2/3}$', r'$l$'])
         plt.savefig(filename + '/t' + t + '_' + str(i) + '.png')
         plt.clf()
     print('Plotted MHD')
+
+
+def load_data(fname, n):
+
+    def f(n):
+        return folder + '.out' + output_id + '.%05d' % n + '.athdf'
+
+    # Seagate
+    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+
+    # Thunderbird
+    # folder = '/data/johza721/output/MHDTurb/'
+    # Input
+    folder += fname + '/Turb'  # Name of output
+    output_id = '2'  # Output ID (set in input file)
+    filename = f(n)
+    return athdf(filename)
 
 
 def plot_struct(l_grid, v_avg, t, fname):
@@ -155,9 +173,7 @@ def plot_struct(l_grid, v_avg, t, fname):
 
 
 def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
-    '''Calculates and plots structure function.
-    Takes about 20s for a 128 cube grid file with 1 million random pairs.
-    '''
+    '''Calculates and plots structure function.'''
 
     def get_length():
         '''Returns the dimensions of the simulation.'''
@@ -169,23 +185,8 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
         tp = tuple(p)
         return np.array([zz[tp], yy[tp], xx[tp]])
 
-    def f(n):
-        return folder + '.out' + output_id + '.%05d' % n + '.athdf'
-
     # Read in data and set up grid
-
-    # Seagate
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-    if do_mhd:
-        folder += 'MHD/'
-
-    # Thunderbird
-    # folder = '/data/johza721/output/MHDTurb/'
-    # Input
-    folder += fname + '/Turb'  # Name of output
-    output_id = '2'  # Output ID (set in input file)
-    filename = f(n)
-    data = athdf(filename)
+    data = load_data(fname, n)
 
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
@@ -230,8 +231,10 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
     if do_mhd:
         θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
         titles, vels, Bs = [], [], []
+        print('Getting l-grid')
         l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
 
+        print('Getting structure functions')
         for i, l_m in enumerate(l_mask):
             titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
                           + str(θ[i+1]) + r'$^\circ$' + ' at t = ' + t)
@@ -244,5 +247,5 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
 
     print('Calculating full velocity structure function')
     l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
-    print('Plotting Struct')
+    print('Plotting structure function')
     plot_struct(l_grid, Δv_avg, t, fname)

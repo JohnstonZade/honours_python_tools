@@ -36,11 +36,11 @@ def spectrum(folder_name, plot_title, do_mhd=1, do_full_calc=1):
         read_f = lambda f: athdf(f)  # put athena read file here
 
         # create grid of K from first time step
-        filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-        filename += 'hydro_cont_turb_32/Turb.out2.00128.athdf'
-        D = athdf(filename)
-        # D = read_f(fname(nums[0]))
-        x = D['x1f']  # Do I use x1f or x1v?
+        # filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+        # filename += 'hydro_cont_turb_32/Turb.out2.00128.athdf'
+        # D = athdf(filename)
+        D = read_f(fname(nums[0]))
+        x = D['x1f']
         y = D['x2f']
         z = D['x3f']
         dx = x[1] - x[0]
@@ -56,8 +56,7 @@ def spectrum(folder_name, plot_title, do_mhd=1, do_full_calc=1):
         for k in range(3):
             K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
-        K3d = np.ndarray([K[0], K[1], K[2]])
-        K3d
+        KX, KY, KZ = np.meshgrid(K[1], K[2], K[3])
 
         # TODO: make a structure/dict to hold spectrum
 
