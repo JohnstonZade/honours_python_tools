@@ -38,7 +38,7 @@ def spectrum(folder_name, plot_title, do_mhd=1, do_full_calc=1):
         # create grid of K from first time step
         # filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
         # filename += 'hydro_cont_turb_32/Turb.out2.00128.athdf'
-        # D = athdf(filename)
+
         D = read_f(fname(nums[0]))
         x = D['x1f']
         y = D['x2f']
@@ -46,19 +46,23 @@ def spectrum(folder_name, plot_title, do_mhd=1, do_full_calc=1):
         dx = x[1] - x[0]
         dy = y[1] - y[0]
         dz = z[1] - z[0]
-        Ls = [np.max(x), np.max(y), np.max(z)]
-        Ns = [len(x), len(y), len(z)]
+        Ls = [2, 3, 4] # [np.max(x), np.max(y), np.max(z)]
+        Ns = [32, 32, 32] # [len(x), len(y), len(z)]
 
-        Ls
         # create grid in k-space
         # not sure if best way to get FT standard [0 1 2 3...-N/2 -N/2+1...-1]
         K = {}
         for k in range(3):
             K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
-        KX, KY, KZ = np.meshgrid(K[1], K[2], K[3])
+        KX, KY, KZ = np.meshgrid(K[0], K[1], K[2])
+        Kprl = np.abs(KX)
+        Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
+        Kmag = np.sqrt(Kprl**2+Kperp**2)
+        Kspec = Kmag
 
-        # TODO: make a structure/dict to hold spectrum
+        kgrid = np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1])
+        # TODO: make a structure/dict to hold spectrum?
 
         # normalize modes
 
@@ -75,6 +79,9 @@ def spectrum(folder_name, plot_title, do_mhd=1, do_full_calc=1):
 
 
 def ft_array(N):
+    '''For given N, returns an array conforming to FT standard:
+       [0 1 2 3 ... -N/2 -N/2+1 ... -1]
+    '''
     return np.concatenate((np.arange(1, N//2, 1), [-N//2], np.arange(-N//2+1, 0, 1)))
 
 

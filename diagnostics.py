@@ -37,7 +37,6 @@ def plot_rms(fname, do_mhd=1):
         B.append(b_rms)
 
     plt.plot(T, V, T, B)
-    # plt.plot(T, 0.5*np.ones(len(T)), ':')
     plt.plot(T, np.mean(V)*np.ones(len(T)), ':',
              T, np.mean(B)*np.ones(len(T)), ':')
     plt.title('Time Evolution of Perpendicular Fluctuations (RMS)')

@@ -164,7 +164,7 @@ def plot_struct(l_grid, v_avg, t, fname):
     if not os.path.exists(filename):
         os.makedirs(filename)
 
-    plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3))
+    plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3), ':')
     plt.title(r'$S_2(l)$ at $t=$ ' + t)
     plt.xlabel(r'log($l$)')
     plt.ylabel(r'log($S_2(l)$))')
