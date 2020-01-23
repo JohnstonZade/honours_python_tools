@@ -91,11 +91,21 @@ def plot_rms(fname, do_mhd=1):
 
 def shearstrain_pdf(fname, n, do_ft):
     # get delta p, nu_c and p_0 to calculate bb:nabla u
+    data = load_data(fname, n)
+    pprp = data['pprp']
+    pprl = data['pprl']
+    Δp = pprp - pprl
+    p_0 = 100.  # need to add output from Athena
+    ν_c = 10e8  # need to add output from Athena
 
-    if do_ft:
+    μ_Brag = p_0/ν_c
+    prlshear = Δp / μ_Brag
+    prlshear
+     if do_ft:
         # use ft for gradient to find bb:nabla u
-        ft_pdf()
+        ft_n, ft_bins, ft_patches = ft_pdf()
 
+    n, bins, patches = plt.hist(prlshear, 100)
     # plot/return histogram
     return 1
 
@@ -118,8 +128,8 @@ def ft_array(N):
 
 
 # Very tentative, don't think this is right for a Fourier transform
-# Will work for spectrum but am wanting to try get a velocity Fourier transform
-# to get Kx from ux etc
+# Will work for spectrum.py but am wanting to try get a velocity Fourier
+# transform to get Kx from ux etc
 def ft(v1, v2, v3, k_grid):
     Ls = [np.max(v1), np.max(v2), np.max(v3)]
     Ns = [len(v1), len(v2), len(v3)]
