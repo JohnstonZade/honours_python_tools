@@ -1,22 +1,11 @@
 '''Code to calculate structure function of a fluid simulation.'''
-# Change to athena_read dir
-import sys
-sys.path.insert(1, '/home/zade/athena/vis/python')
-# Thunderbird
-# sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
 import os
-from athena_read import athdf  # no h5py on thunderbird
 import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
 from matplotlib import rc
+from diagnostics import get_mag, get_unit, load_data
 rc('text', usetex=True)  # LaTeX labels
-
-
-def get_mag(X):
-    '''Returns the magnitude of the given vector.'''
-    x = np.array(X)
-    return np.sqrt(np.sum(x**2, axis=1))
 
 
 def generate_points(grid, N):
@@ -68,12 +57,6 @@ def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
         return float('nan')
 
     return np.mean(y_sel)
-
-
-def get_unit(v):
-    '''Calculates unit vector.'''
-    v_mag = get_mag(v)
-    return np.array([v[i]/v_mag[i] for i in range(len(v))])
 
 
 def get_l_perp(L1, L2, l, B):
@@ -138,23 +121,6 @@ def plot_MHD(l, t, titles, vels, Bs, fname):
         plt.savefig(filename + '/t' + t + '_' + str(i) + '.png')
         plt.clf()
     print('Plotted MHD')
-
-
-def load_data(fname, n):
-
-    def f(n):
-        return folder + '.out' + output_id + '.%05d' % n + '.athdf'
-
-    # Seagate
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-
-    # Thunderbird
-    # folder = '/data/johza721/output/MHDTurb/'
-    # Input
-    folder += fname + '/Turb'  # Name of output
-    output_id = '2'  # Output ID (set in input file)
-    filename = f(n)
-    return athdf(filename)
 
 
 def plot_struct(l_grid, v_avg, t, fname):
