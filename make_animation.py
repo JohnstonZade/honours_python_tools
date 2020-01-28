@@ -1,3 +1,6 @@
+'''Methods to create animations showing evolution of graphed quantities
+   over time.
+'''
 import sys
 import imageio
 import glob

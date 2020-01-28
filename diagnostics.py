@@ -1,17 +1,14 @@
+'''Code to calculate diagnostics such as root mean square and probability
+   density functions for fluid simulations.
+'''
 import glob
 import numpy as np
+import numpy.fft as fft
 import matplotlib.pyplot as plt
+from athena_read import athdf
 from math import pi
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
-
-# Change to athena_read dir
-import sys
-sys.path.insert(1, '/home/zade/athena/vis/python')
-# Thunderbird
-# sys.path.insert(1, '/nfs_physics/users/stud/johza721/athena/vis/python')
-from athena_read import athdf  # no h5py on thunderbird
-
 
 
 def load_data(fname, n):
@@ -31,6 +28,14 @@ def load_data(fname, n):
     filename = f(n)
     return athdf(filename)
 
+# --- VECTOR FUNCTIONS --- #
+
+
+def get_mag(X):
+    '''Returns the magnitude of the given vector.'''
+    x = np.array(X)
+    return np.sqrt(np.sum(x**2, axis=1))
+
 
 def get_unit(v):
     '''Calculates unit vector.'''
@@ -38,10 +43,16 @@ def get_unit(v):
     return np.array([v[i]/v_mag[i] for i in range(len(v))])
 
 
-def get_mag(X):
-    '''Returns the magnitude of the given vector.'''
-    x = np.array(X)
-    return np.sqrt(np.sum(x**2, axis=1))
+def get_vec(v, p):
+    '''Returns the vector components at a given point.'''
+    tp = tuple(p)
+    v1 = v[0][tp]  # x-component
+    v2 = v[1][tp]  # y-component
+    v3 = v[2][tp]  # z-component
+    return np.array([v1, v2, v3])
+
+
+# --- RMS FUNCTIONS  --- #
 
 
 # FIX: Find a way to get perpendicular vector components
@@ -86,37 +97,70 @@ def plot_rms(fname, do_mhd=1):
     plt.clf()
 
 
-# --- PDF --- #
+# --- bb:∇u PDF FUNCTIONS --- #
 
 
-def shearstrain_pdf(fname, n, do_ft):
-    # get delta p, nu_c and p_0 to calculate bb:nabla u
+def prlshear_pdf(fname, n, do_ft):
+    # pprp and pprl are set to p_0 initially
+    p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
+    # Convention: putting ν_c (nuc) value at end of file name
+    x = fname.rfind('nuc') + 3
+    ν_c = float(fname[x:])
+
+    # get delta p, nu_c and p_0 to calculate bb:grad u
     data = load_data(fname, n)
+    # Perpendicular and parallel pressures
     pprp = data['pprp']
     pprl = data['pprl']
-    Δp = pprp - pprl
-    p_0 = 100.  # need to add output from Athena
-    ν_c = 10e8  # need to add output from Athena
+    Δp = (pprp - pprl).flatten()
 
     μ_Brag = p_0/ν_c
-    prlshear = Δp / μ_Brag
-    prlshear
-     if do_ft:
+    prlshear = Δp/μ_Brag  # bb:grad u
+
+    if do_ft:
         # use ft for gradient to find bb:nabla u
-        ft_n, ft_bins, ft_patches = ft_pdf()
+        # to compare with the above way of calculating
+        ft_n, ft_bins, ft_patches = prlshearft_pdf(data)
 
-    n, bins, patches = plt.hist(prlshear, 100)
-    # plot/return histogram
-    return 1
+    n, bins, patches = plt.hist(prlshear, 100, density=True)
+    # plot histogram
 
 
-def ft_pdf():
+def prlshearft_pdf(data):
+
+    def dv(i, j):
+        return np.real(fft.ifftn(K[i]*fft.fftn(vel_data[j])))
+
+    def pnts(p):
+        points = []
+        for zz in range(p[0]):
+            for yy in range(p[1]):
+                for xx in range(p[2]):
+                    points.append((zz, yy, xx))
+        return np.array(points)
+
     # ft stuff
-    # plot/return histogram
-    return 1
+    points = pnts(data['RootGridSize'][::-1])
+    K = ft_grid(data, 0)
+    vel_data = (data['vel1'], data['vel2'], data['vel3'])
+    B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
+    B_vec = np.array([get_vec(B_data, p) for p in points])
+    b = get_unit(B_vec)
+    B2avg = np.mean(get_mag(B_vec)**2)  # spatial average of B^2
+
+    # Calculate b_i b_j ∂_i u_j
+    # with ∂_i u_j = ifft(K_i fft(u_j))
+    # over all space
+    prlshear = 0
+    for i in range(3):
+        for j in range(3):
+            prlshear += b[:, i]*b[:, j]*dv(i, j).flatten()
+    prlshear *= 4*pi/B2avg
+    n, bins, patches = plt.hist(prlshear, 100, density=True)
+    plt.yscale('log', nonposy='clip')
 
 
-# --- FOURIER --- #
+# --- FOURIER FUNCTIONS --- #
 
 
 def ft_array(N):
@@ -127,18 +171,16 @@ def ft_array(N):
                            np.arange(-N//2+1, 0, 1)))
 
 
-# Very tentative, don't think this is right for a Fourier transform
-# Will work for spectrum.py but am wanting to try get a velocity Fourier
-# transform to get Kx from ux etc
-def ft(v1, v2, v3, k_grid):
-    Ls = [np.max(v1), np.max(v2), np.max(v3)]
-    Ns = [len(v1), len(v2), len(v3)]
+def ft_grid(data, k_grid):
+    p = (data['x3f'], data['x2f'], data['x1f'])
+    Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]
+    Ns = [len(p[0]), len(p[1]), len(p[2])]
 
     K = {}
     for k in range(3):
         K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
-    to_ret = np.meshgrid(K[0], K[1], K[2])
+    to_ret = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
         to_ret = (to_ret, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
 

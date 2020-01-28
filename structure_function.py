@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from diagnostics import get_mag, get_unit, load_data
+from diagnostics import get_mag, get_unit, get_vec, load_data
 rc('text', usetex=True)  # LaTeX labels
 
 
@@ -19,15 +19,6 @@ def generate_points(grid, N):
     # Ensure points are in the grid
     L2 = np.mod(L2, grid)
     return L1, L2
-
-
-def get_vec(v, p):
-    '''Returns the vector components at a given point.'''
-    tp = tuple(p)
-    v1 = v[0][tp]  # x-component
-    v2 = v[1][tp]  # y-component
-    v3 = v[2][tp]  # z-component
-    return np.array([v1, v2, v3])
 
 
 def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
