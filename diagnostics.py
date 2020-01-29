@@ -5,7 +5,7 @@ import glob
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from athena_read import athdf
+from athena_read import athdf, hst
 from math import pi
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
@@ -28,6 +28,15 @@ def load_data(fname, n):
     filename = f(n)
     return athdf(filename)
 
+
+def load_hst(fname):
+    # Seagate
+    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+
+    hstLoc = folder + fname + '/Turb.hst'
+    return hst(hstLoc)
+
+    
 # --- VECTOR FUNCTIONS --- #
 
 
@@ -101,7 +110,7 @@ def plot_rms(fname, do_mhd=1):
 
 
 def prlshear_pdf(fname, n, do_ft):
-    # pprp and pprl are set to p_0 initially
+    # pprp and pprl are set to p_0 initially over the box
     p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
     # Convention: putting ν_c (nuc) value at end of file name
     x = fname.rfind('nuc') + 3
@@ -129,6 +138,7 @@ def prlshear_pdf(fname, n, do_ft):
 def prlshearft_pdf(data):
 
     def dv(i, j):
+        '''Calculates gradient of the components of vel_data using FFT.'''
         return np.real(fft.ifftn(K[i]*fft.fftn(vel_data[j])))
 
     def pnts(p):
@@ -158,7 +168,9 @@ def prlshearft_pdf(data):
     prlshear *= 4*pi/B2avg
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     plt.yscale('log', nonposy='clip')
-
+    plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
+    plt.ylabel(r'$\mathcal{P}$')
+    # plt.title('PDF for bb:Gu with [CALCULATE AND ADD PARAMETERS HERE]')
 
 # --- FOURIER FUNCTIONS --- #
 
@@ -172,7 +184,8 @@ def ft_array(N):
 
 
 def ft_grid(data, k_grid):
-    p = (data['x3f'], data['x2f'], data['x1f'])
+    # X, Y, Z
+    p = (data['x1f'], data['x2f'], data['x3f'])
     Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]
     Ns = [len(p[0]), len(p[1]), len(p[2])]
 

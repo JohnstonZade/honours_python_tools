@@ -2,50 +2,117 @@
    in a fluid simulation.
 '''
 import numpy as np
-from diagnostics import ft_grid, load_data
+import numpy.fft as fft
+import matplotlib.pyplot as plt
+from diagnostics import ft_grid, load_data, load_hst
 from math import pi
-# plotting
-# fft
-
-# TODO: Add unit tests
 
 
-def spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
-    is_cont = 'cont' in fname
-
+def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
     # Getting turnover time and converting to file number
-    tau = get_turnover_time(fname, is_cont)
-    tau_file = 10*int(tau)
-
-    # File numbers to average over
-    # Figure out more adaptive way for decay
-    nums = range(tau_file, 6*tau_file+1) if is_cont else range(tau_file, 301)
-    return nums
+    tau_file, nums = get_turnover_time(fname, 0)
 
     if do_full_calc:
         # create grid of K from first time step
-        # filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-        # filename += 'hydro_cont_turb_32/Turb.out2.00128.athdf'
 
+        # fname = 'cgl_6432_brag_nuc1e3'
+        # tau_file = 1
+        # nums = 10
+        # do_mhd = 1
         data = load_data(fname, tau_file)
-        KX, KY, KZ, kgrid = ft_grid(data, 1)
+        (KX, KY, KZ), kgrid = ft_grid(data, 1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
         Kmag = np.sqrt(Kprl**2+Kperp**2)
         Kspec = Kmag
 
+        # Dictionary to hold spectrum information
+        S = {}
+        S['Nk'] = len(kgrid) - 1
+        S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])
+
         # normalize modes
+        oneGrid = np.ones(KX.shape)
+        S['nbin'] = spect1D(oneGrid, oneGrid, Kspec, kgrid)*np.size(oneGrid)**2
+        S['nnorm'] = S['nbin']/S['kgrid']**2
+        S['nnorm'] /= np.mean(S['nnorm'])
 
         # average over snapshots in nums
+        def m3(a):
+            return np.mean(np.mean(np.mean(a)))
 
+        ns = 0
+        fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
+                  'EK', 'EM', 'B', 'rho']
+
+        # Initializing variable fields in spectrum dictionary
+        for var in fields:
+            S[var] = 0
+
+        for n in nums:
+            try:
+                data = load_data(fname, n)
+            except IOError:
+                print('Could not load file', n)
+                break
+
+            print('Doing n =', n)
+
+            for vel in fields[:3]:
+                ft = fft.fftn(data[vel])
+                S[vel] += spect1D(ft, ft, Kspec, kgrid)
+                S['EK'] += S[vel]
+
+            if do_mhd:
+                Bmag = 0
+                for Bcc in fields[3:6]:
+                    ft = fft.fftn(data[Bcc])
+                    S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
+                    S['EM'] += S[Bcc]
+                    Bmag += data[Bcc]**2
+                Bmag = np.sqrt(Bmag)
+                ft_Bmag = fft.fftn(Bmag)
+                S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
+
+            ft_rho = fft.fftn(data['rho'] - m3(data['rho']))
+            S['rho'] += spect1D(ft_rho, ft_rho, Kspec, kgrid)
+
+            ns += 1
+
+        for var in fields:
+            S[var] /= ns
+        S['nums'] = nums
+        S
         # save spectrum data somehow
     else:
         # load spectrum data
         return 2
+    plot_spectrum(S, plot_title)
+
+
+def plot_spectrum(S, plot_title):
     # plot spectrum
+    plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['B'],
+               S['kgrid'], S['kgrid']**(-5/3), ':')
+    plt.xlabel(r'$k$')
+    plt.ylabel(r'$E_K$')
+    plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
+    plt.title('Energy  Spectrum:' + plot_title)
     # save figure
     # plot energy time evolution
     # save figure
+
+# TODO: not working for velocity and magnetic fields.
+def spect1D(v1, v2, K, kgrid):
+    nk = len(kgrid) - 1
+    out = np.zeros((nk, 1))
+    NT2 = np.size(K)**2
+    for k in range(nk):
+        mask = np.logical_and(K < kgrid[k+1], K > kgrid[k])
+        check = np.real(v1[mask])*np.conj(v2[mask])
+        sum = np.sum(check)
+        out[k] = sum / NT2
+    return out
 
 
 def ath_plot_hst(folder_name, plot_title):
@@ -55,15 +122,33 @@ def ath_plot_hst(folder_name, plot_title):
     return None
 
 
-def get_turnover_time(folder_name, is_cont):
-    # Add file names
-    # Import data from .hst files
+def get_turnover_time(fname, do_decay):
+    hstData = load_hst(fname)
+    KEx, KEy, KEz = hstData['1-KE'], hstData['2-KE'], hstData['3-KE']
 
-    # if is_cont
-    # average turnover time in saturated state
+    u_L = 0.
+    if do_decay:
+        u_L = np.sqrt(2*(KEx[1]+KEy[1]+KEz[1]))
+    else:
+        n = 0
+        for f in range(100, 3001):
+            try:
+                u_L += np.sqrt(2*(KEx[f]+KEy[f]+KEz[f]))
+                n += 1
+            except IndexError:
+                print('No entry at', f)
+                break
+            u_L /= n
+    u_L
+    tau = 1 / u_L
+    tau_file = int(tau)
 
-    # else
-    # calculate initial turnover time
+    tau_file = 10
 
-    # return turnover time
-    return 12.56
+    if do_decay:
+        nums = range(tau_file, 301)
+    else:
+        nums = range(tau_file, 6*tau_file+1)
+
+
+    return tau_file, nums

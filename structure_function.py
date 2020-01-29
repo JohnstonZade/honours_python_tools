@@ -9,7 +9,9 @@ rc('text', usetex=True)  # LaTeX labels
 
 
 def generate_points(grid, N):
-    '''Generate N pairs of random points on the grid.'''
+    '''Generate N pairs of random points on the grid. Biased towards generating
+    points that are closer together.
+    '''
     N_p = int(N)
     L1 = randint(0, grid, size=(N_p, len(grid)))
     # Generate second set of random points to bias closer to points in L1
@@ -39,7 +41,9 @@ def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
 
 
 def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
-    '''Calculate the mean of the selection.'''
+    '''Calculate the mean of the selection. Mask parameters are only used
+    for the select_y() call.
+    '''
     y_sel = select_y(x, x_bin, y, i, mask, use_mask)
 
     # Stops error for mean of empty slice
@@ -51,6 +55,17 @@ def get_mean(x, x_bin, y, i, mask=[], use_mask=0):
 
 
 def get_l_perp(L1, L2, l, B):
+    '''Finds the lengths of vectors whose angle to the magnetic field is
+    within a specified range. Essentially does the following:
+    For a distribution of points L1, L2
+        Gets the magnetic field vectors at L1 and L2
+        Takes the average of the two to get the mean field.
+    Gets l and B unit vectors and then calculates cos(theta) = l dot b
+    Bins l vectors with theta = [0, 15, 30, 45, 60, 75, 90]
+        0-15 is l_parallel, 45-90 is l_perp
+    Outputs angle list and mask for the l vector in order for the
+    structure function to be calculated.
+    '''
     # Calculate average B field between point pairs
     B1_vec = np.array([get_vec(B, p) for p in L1])
     B2_vec = np.array([get_vec(B, p) for p in L2])
@@ -63,14 +78,15 @@ def get_l_perp(L1, L2, l, B):
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
+    # Create l_mask depending on θ
     l_mask = [select_y(θ_data, θ_rad, get_mag(l), i, return_mask=1)
               for i in range(θlen)]
     return θ, l_mask
 
 
 def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
-    # For each pair of position vectors x1, x2
-    # Get velocity/Bfield vectors v1, v2 at each point
+    # For each pair of position vectors x1 ∈ L1, x2 ∈ L2
+    # Get vectors v1, v2 at each point
     # Calculate Δv2 = abs(v1 - v2)**2
     # We now have a mapping of l to Δv2 <- structure function
     v1_vec = np.array([get_vec(v, p) for p in L1])
@@ -145,7 +161,6 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
 
     # Read in data and set up grid
     data = load_data(fname, n)
-
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
     t = '{:.1f}'.format(data['Time']) + ' s'
@@ -155,7 +170,6 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
     vel_data = (data['vel1'], data['vel2'], data['vel3'])
     if do_mhd:
         B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
-
     L1, L2 = generate_points(grid, N)
     print('Generated points')
 
@@ -166,10 +180,11 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
     l_vec = x1_vec - x2_vec
     # Find distance between each pair of points
     l_mag = get_mag(l_vec)
+    # Maximum box side length for making l_grid in calc_struct()
     L = np.max(get_length())
     print('Lengths calculated')
 
-    # Check distribution of l's
+    # Output distribution of l vector lengths
     if do_ldist:
         n, bins, patches = plt.hist(l_mag, 100)
         plt.title(r'Distribution of $l$ at $t =$ ' + t)
@@ -177,15 +192,6 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
         plt.ylabel('Counts')
         plt.show()
 
-    # MHD: Get magnetic field components
-    # Get l and B unit vectors then get
-    # cos(theta) = l dot b
-    # bin with theta = [0, 15, 30, 45, 60, 75, 90]
-    # 0-15 is l_parallel
-    # 45-90 is l_perp
-    # display structure function for each bin (eg 0-15)
-    # using both average velocity at each pair of points
-    # and average B field at each pair of points (12 total)
     if do_mhd:
         θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
         titles, vels, Bs = [], [], []
