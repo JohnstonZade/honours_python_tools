@@ -93,6 +93,7 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
     # plot_energy_evo(fname, plot_title)
 
 
+# TODO: work on saving figure
 def plot_spectrum(S, plot_title, do_mhd=1):
     # plot spectrum
     if do_mhd:
@@ -124,7 +125,7 @@ def spect1D(v1, v2, K, kgrid):
     return out
 
 
-# TODO: work on making more general
+# TODO: work on making more general, check against MATLAB
 def get_turnover_time(fname, do_decay):
     hstData = load_hst(fname)
     KEx, KEy, KEz = hstData['1-KE'], hstData['2-KE'], hstData['3-KE']
