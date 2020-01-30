@@ -36,7 +36,7 @@ def load_hst(fname):
     hstLoc = folder + fname + '/Turb.hst'
     return hst(hstLoc)
 
-    
+
 # --- VECTOR FUNCTIONS --- #
 
 
@@ -106,9 +106,39 @@ def plot_rms(fname, do_mhd=1):
     plt.clf()
 
 
+# TODO: implement saving plot
+def plot_energy_evo(fname, plot_title='test'):
+
+    def get_vol(fname):
+        data = load_data(fname, 0)
+        X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
+        X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
+        X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
+        return abs(X1*X2*X3)
+
+    hstData = load_hst(fname)
+    vol = get_vol(fname)
+    t = hstData['time']
+    # tau = get_turnover_time(fname, 0)[0]
+    # t /= tau
+
+    KE = (hstData['2-KE'] + hstData['3-KE']) / vol  # kinetic energy
+    ME = (hstData['2-ME'] + hstData['3-ME']) / vol  # magnetic energy
+    TE = hstData['tot-E']                           # thermal energy
+    norm = 1
+    plt.semilogy(t, KE/norm, t, ME/norm, t, TE/norm)
+
+
+# TODO: implement calculation
+def It_Brag(fname):
+    It = 1
+    return It
+
+
 # --- bb:∇u PDF FUNCTIONS --- #
 
 
+# TODO: focus on getting working
 def prlshear_pdf(fname, n, do_ft):
     # pprp and pprl are set to p_0 initially over the box
     p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
@@ -135,6 +165,7 @@ def prlshear_pdf(fname, n, do_ft):
     # plot histogram
 
 
+# TODO: make independent function
 def prlshearft_pdf(data):
 
     def dv(i, j):
@@ -151,7 +182,7 @@ def prlshearft_pdf(data):
 
     # ft stuff
     points = pnts(data['RootGridSize'][::-1])
-    K = ft_grid(data, 0)
+    K = ft_grid(data, 0)[::-1]
     vel_data = (data['vel1'], data['vel2'], data['vel3'])
     B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
     B_vec = np.array([get_vec(B_data, p) for p in points])
@@ -184,8 +215,8 @@ def ft_array(N):
 
 
 def ft_grid(data, k_grid):
-    # X, Y, Z
-    p = (data['x1f'], data['x2f'], data['x3f'])
+    # Z, Y, X
+    p = (data['x3f'], data['x2f'], data['x1f'])
     Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]
     Ns = [len(p[0]), len(p[1]), len(p[2])]
 
@@ -193,6 +224,7 @@ def ft_grid(data, k_grid):
     for k in range(3):
         K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
+    # Outputs Z, Y, X
     to_ret = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
         to_ret = (to_ret, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))

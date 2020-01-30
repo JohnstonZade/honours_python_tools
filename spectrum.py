@@ -4,21 +4,18 @@
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from diagnostics import ft_grid, load_data, load_hst
-from math import pi
+from diagnostics import ft_grid, load_data, load_hst  # , plot_energy_evo
 
 
-def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
+# TODO: work on saving/loading dictionary
+def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
+
     # Getting turnover time and converting to file number
     tau_file, nums = get_turnover_time(fname, 0)
 
     if do_full_calc:
         # create grid of K from first time step
 
-        # fname = 'cgl_6432_brag_nuc1e3'
-        # tau_file = 1
-        # nums = 10
-        # do_mhd = 1
         data = load_data(fname, tau_file)
         (KX, KY, KZ), kgrid = ft_grid(data, 1)
         Kprl = np.abs(KX)
@@ -31,7 +28,9 @@ def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
         S['Nk'] = len(kgrid) - 1
         S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])
 
-        # normalize modes
+        # Count the number of modes in each bin to normalize later -- this
+        # gives a smoother result, as we want the average energy in each bin.
+        # TODO: check where this is used
         oneGrid = np.ones(KX.shape)
         S['nbin'] = spect1D(oneGrid, oneGrid, Kspec, kgrid)*np.size(oneGrid)**2
         S['nnorm'] = S['nbin']/S['kgrid']**2
@@ -61,7 +60,7 @@ def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
             for vel in fields[:3]:
                 ft = fft.fftn(data[vel])
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
-                S['EK'] += S[vel]
+                S['EK'] += S[vel]  # Total spectrum is sum of each component
 
             if do_mhd:
                 Bmag = 0
@@ -70,6 +69,7 @@ def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
                     S[Bcc] += spect1D(ft, ft, Kspec, kgrid)
                     S['EM'] += S[Bcc]
                     Bmag += data[Bcc]**2
+
                 Bmag = np.sqrt(Bmag)
                 ft_Bmag = fft.fftn(Bmag)
                 S['B'] += spect1D(ft_Bmag, ft_Bmag, Kspec, kgrid)
@@ -79,49 +79,52 @@ def calc_spectrum(fname, plot_title, do_mhd=1, do_full_calc=1):
 
             ns += 1
 
+        # Average over times done
         for var in fields:
             S[var] /= ns
         S['nums'] = nums
-        S
+
         # save spectrum data somehow
+        # try using pickle
     else:
         # load spectrum data
-        return 2
-    plot_spectrum(S, plot_title)
+        return 0
+    plot_spectrum(S, plot_title, do_mhd)
+    # plot_energy_evo(fname, plot_title)
 
 
-def plot_spectrum(S, plot_title):
+def plot_spectrum(S, plot_title, do_mhd=1):
     # plot spectrum
-    plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['B'],
-               S['kgrid'], S['kgrid']**(-5/3), ':')
+    if do_mhd:
+        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['B'],
+                   S['kgrid'], S['kgrid']**(-5/3), ':')
+        plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
+    else:
+        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['kgrid']**(-5/3), ':')
+        plt.legend([r'$E_K$', r'$k^{-5/3}$'])
     plt.xlabel(r'$k$')
     plt.ylabel(r'$E_K$')
-    plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
-    plt.title('Energy  Spectrum:' + plot_title)
-    # save figure
-    # plot energy time evolution
+    plt.title('Energy  Spectrum: ' + plot_title)
+    plt.show()
     # save figure
 
-# TODO: not working for velocity and magnetic fields.
+
 def spect1D(v1, v2, K, kgrid):
+    '''Function to find the spectrum < v1 v2 >,
+    K is the kgrid associated with v1 and v2
+    kgrid is the grid for spectral shell binning
+    '''
     nk = len(kgrid) - 1
     out = np.zeros((nk, 1))
     NT2 = np.size(K)**2
     for k in range(nk):
         mask = np.logical_and(K < kgrid[k+1], K > kgrid[k])
-        check = np.real(v1[mask])*np.conj(v2[mask])
-        sum = np.sum(check)
-        out[k] = sum / NT2
+        sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
+        out[k] = np.real(sum) / NT2
     return out
 
 
-def ath_plot_hst(folder_name, plot_title):
-    # Add file names
-    # Import data from .hst files, use athena_read.py
-    # Get turnover time
-    return None
-
-
+# TODO: work on making more general
 def get_turnover_time(fname, do_decay):
     hstData = load_hst(fname)
     KEx, KEy, KEz = hstData['1-KE'], hstData['2-KE'], hstData['3-KE']
