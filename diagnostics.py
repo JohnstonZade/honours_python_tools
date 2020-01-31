@@ -2,6 +2,7 @@
    density functions for fluid simulations.
 '''
 import glob
+import pickle
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
@@ -12,6 +13,9 @@ rc('text', usetex=True)  # LaTeX labels
 
 
 def load_data(fname, n):
+    '''Loads data from .athdf files output from Athena++, using modules
+    from the athena_read code.
+    '''
 
     def f(n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
@@ -30,11 +34,35 @@ def load_data(fname, n):
 
 
 def load_hst(fname):
+    '''Loads data from .hst files output from Athena++, using modules
+    from the athena_read code.
+    '''
     # Seagate
     folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
 
     hstLoc = folder + fname + '/Turb.hst'
     return hst(hstLoc)
+
+
+def load_dict(fname=''):
+    file = 'S_dict.pkl'
+    if fname != '':
+        file = fname + '_' + file
+
+    pkl_file = open(file, 'rb')
+    dict = pickle.load(pkl_file)
+    pkl_file.close()
+    return dict
+
+
+def save_dict(dict, fname=''):
+    file = 'S_dict.pkl'
+    if fname != '':
+        file = fname + '_' + file
+
+    output = open(file, 'wb')
+    pickle.dump(dict, output)
+    output.close()
 
 
 # --- VECTOR FUNCTIONS --- #
@@ -83,8 +111,8 @@ def get_rms(fname, n, do_mhd):
 
 
 def plot_rms(fname, do_mhd=1):
-    path = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-    filename = path + fname
+    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+    filename = folder + fname
     n_max = len(glob.glob(filename+'/*.athdf'))
 
     T, V, B = [], [], []
@@ -114,7 +142,7 @@ def plot_energy_evo(fname, plot_title='test'):
         X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
         X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
         X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
-        return abs(X1*X2*X3)
+        return abs(X1*X2*X3)  # just a check to make volume positive
 
     hstData = load_hst(fname)
     vol = get_vol(fname)
@@ -124,7 +152,7 @@ def plot_energy_evo(fname, plot_title='test'):
 
     KE = (hstData['2-KE'] + hstData['3-KE']) / vol  # kinetic energy
     ME = (hstData['2-ME'] + hstData['3-ME']) / vol  # magnetic energy
-    TE = hstData['tot-E']                           # thermal energy
+    TE = hstData['tot-E'] / vol                     # thermal energy
     norm = 1
     plt.semilogy(t, KE/norm, t, ME/norm, t, TE/norm)
 
@@ -139,7 +167,7 @@ def It_Brag(fname):
 
 
 # TODO: focus on getting working
-def prlshear_pdf(fname, n, do_ft):
+def prlshear_pdf(fname, n):
     # pprp and pprl are set to p_0 initially over the box
     p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
     # Convention: putting ν_c (nuc) value at end of file name
@@ -156,17 +184,12 @@ def prlshear_pdf(fname, n, do_ft):
     μ_Brag = p_0/ν_c
     prlshear = Δp/μ_Brag  # bb:grad u
 
-    if do_ft:
-        # use ft for gradient to find bb:nabla u
-        # to compare with the above way of calculating
-        ft_n, ft_bins, ft_patches = prlshearft_pdf(data)
-
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     # plot histogram
 
 
 # TODO: make independent function
-def prlshearft_pdf(data):
+def prlshearft_pdf(fname, n):
 
     def dv(i, j):
         '''Calculates gradient of the components of vel_data using FFT.'''
@@ -181,15 +204,17 @@ def prlshearft_pdf(data):
         return np.array(points)
 
     # ft stuff
+    data = load_data(fname, n)
     points = pnts(data['RootGridSize'][::-1])
-    K = ft_grid(data, 0)[::-1]
+
+    K = ft_grid(data, 0)[::-1]  # gets KX, KY, KZ
     vel_data = (data['vel1'], data['vel2'], data['vel3'])
     B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
     B_vec = np.array([get_vec(B_data, p) for p in points])
     b = get_unit(B_vec)
     B2avg = np.mean(get_mag(B_vec)**2)  # spatial average of B^2
 
-    # Calculate b_i b_j ∂_i u_j
+    # Calculate bb:∇u = b_i b_j ∂_i u_j
     # with ∂_i u_j = ifft(K_i fft(u_j))
     # over all space
     prlshear = 0
@@ -197,6 +222,7 @@ def prlshearft_pdf(data):
         for j in range(3):
             prlshear += b[:, i]*b[:, j]*dv(i, j).flatten()
     prlshear *= 4*pi/B2avg
+
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     plt.yscale('log', nonposy='clip')
     plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
@@ -215,6 +241,10 @@ def ft_array(N):
 
 
 def ft_grid(data, k_grid):
+    '''Creates a grid in k-space corresponding to the real grid given in data.
+    k_grid is a boolean that when True calculates a regularly spaced array
+    in k-space.
+    '''
     # Z, Y, X
     p = (data['x3f'], data['x2f'], data['x1f'])
     Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]

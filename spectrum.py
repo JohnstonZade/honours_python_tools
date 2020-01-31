@@ -4,7 +4,8 @@
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from diagnostics import ft_grid, load_data, load_hst  # , plot_energy_evo
+from diagnostics import ft_grid, load_data, load_dict, load_hst
+from diagnostics import plot_energy_evo, save_dict
 
 
 # TODO: work on saving/loading dictionary
@@ -79,25 +80,24 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
 
             ns += 1
 
-        # Average over times done
+        # Average over number of times done
         for var in fields:
             S[var] /= ns
         S['nums'] = nums
 
-        # save spectrum data somehow
-        # try using pickle
+        save_dict(S, fname)
     else:
-        # load spectrum data
-        return 0
+        S = load_dict(fname)
+
     plot_spectrum(S, plot_title, do_mhd)
-    # plot_energy_evo(fname, plot_title)
+    plot_energy_evo(fname, plot_title)
 
 
 # TODO: work on saving figure
 def plot_spectrum(S, plot_title, do_mhd=1):
     # plot spectrum
     if do_mhd:
-        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['B'],
+        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['EM'],
                    S['kgrid'], S['kgrid']**(-5/3), ':')
         plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
     else:
@@ -153,6 +153,5 @@ def get_turnover_time(fname, do_decay):
         nums = range(tau_file, 301)
     else:
         nums = range(tau_file, 6*tau_file+1)
-
 
     return tau_file, nums
