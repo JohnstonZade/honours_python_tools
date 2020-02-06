@@ -5,7 +5,7 @@ import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
 from diagnostics import ft_grid, get_maxn, load_data, load_dict, load_hst
-from diagnostics import plot_energy_evo, save_dict, FIG_PATH
+from diagnostics import save_dict, FIG_PATH
 
 
 def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
