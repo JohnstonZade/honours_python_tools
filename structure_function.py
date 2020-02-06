@@ -4,7 +4,7 @@ import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from diagnostics import get_mag, get_unit, get_vec, load_data
+from diagnostics import get_mag, get_unit, get_vec, load_data, FIG_PATH
 rc('text', usetex=True)  # LaTeX labels
 
 
@@ -103,21 +103,14 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     Δv_avg = np.array([get_mean(l_mag, l_bin, Δv_mag2, i, mask, use_mask)
                        for i in range(N_l)])
 
-    print('Structure Function Calculated')
     return l_grid, Δv_avg
 
 
 def plot_MHD(l, t, titles, vels, Bs, fname):
-    # Check whether folder to save exists
     # Seagate
-    filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'\
-                + 'figs/' + fname
-
-    if not os.path.exists(filename):
-        os.makedirs(filename)
+    filename = FIG_PATH + fname
 
     for i in range(len(titles)):
-        # plt.subplot(3, 2, i+1)
         plt.loglog(l, vels[i], l, Bs[i])
         plt.loglog(l, l**(2/3), ':', l, l, ':')
         plt.title(r'$S_2(l)$ with ' + titles[i])
@@ -127,15 +120,10 @@ def plot_MHD(l, t, titles, vels, Bs, fname):
                     r'$l^{2/3}$', r'$l$'])
         plt.savefig(filename + '/t' + t + '_' + str(i) + '.png')
         plt.clf()
-    print('Plotted MHD')
 
 
 def plot_struct(l_grid, v_avg, t, fname):
-    filename = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'\
-                + 'figs/' + fname
-
-    if not os.path.exists(filename):
-        os.makedirs(filename)
+    filename = FIG_PATH + fname
 
     plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3), ':')
     plt.title(r'$S_2(l)$ at $t=$ ' + t)
@@ -146,7 +134,7 @@ def plot_struct(l_grid, v_avg, t, fname):
     plt.clf()
 
 
-def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
+def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0):
     '''Calculates and plots structure function.'''
 
     def get_length():
@@ -195,21 +183,15 @@ def structure_function(fname, n, do_mhd=0, N=1e6, do_ldist=0):
     if do_mhd:
         θ, l_mask = get_l_perp(L1, L2, l_vec, B_data)
         titles, vels, Bs = [], [], []
-        print('Getting l-grid')
         l_grid = calc_struct(L1, L2, vel_data, l_mag, L)[0]
 
-        print('Getting structure functions')
         for i, l_m in enumerate(l_mask):
             titles.append(str(θ[i]) + r'$^\circ$ $\leq \theta <$ '
                           + str(θ[i+1]) + r'$^\circ$' + ' at t = ' + t)
             vels.append(calc_struct(L1, L2, vel_data, l_mag, L, l_m, 1)[1])
             Bs.append(calc_struct(L1, L2, B_data, l_mag, L, l_m, 1)[1])
-            print('{:.2f}'.format((i+1)/len(l_mask)*100) + '% done')
 
-        print('Plotting MHD')
         plot_MHD(l_grid, t, titles, vels, Bs, fname)
 
-    print('Calculating full velocity structure function')
     l_grid, Δv_avg = calc_struct(L1, L2, vel_data, l_mag, L)
-    print('Plotting structure function')
     plot_struct(l_grid, Δv_avg, t, fname)

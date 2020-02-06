@@ -4,15 +4,18 @@
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from diagnostics import ft_grid, load_data, load_dict, load_hst
-from diagnostics import plot_energy_evo, save_dict
+from diagnostics import ft_grid, get_maxn, load_data, load_dict, load_hst
+from diagnostics import plot_energy_evo, save_dict, FIG_PATH
 
 
-# TODO: work on saving/loading dictionary
 def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
 
     # Getting turnover time and converting to file number
-    tau_file, nums = get_turnover_time(fname, 0)
+    # As for the moment only simulating continuously forced turbulence,
+    # will start from halfway through the sim to the end.
+    max_n = get_maxn(fname)
+    tau_file = int(max_n/2)
+    nums = range(tau_file, max_n)
 
     if do_full_calc:
         # create grid of K from first time step
@@ -56,7 +59,8 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
                 print('Could not load file', n)
                 break
 
-            print('Doing n =', n)
+            if ns % 10 == 0:
+                print('Doing n =', n)
 
             for vel in fields[:3]:
                 ft = fft.fftn(data[vel])
@@ -89,15 +93,13 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
     else:
         S = load_dict(fname)
 
-    plot_spectrum(S, plot_title, do_mhd)
-    plot_energy_evo(fname, plot_title)
+    plot_spectrum(S, fname, plot_title, do_mhd)
 
 
-# TODO: work on saving figure
-def plot_spectrum(S, plot_title, do_mhd=1):
+def plot_spectrum(S, fname, plot_title, do_mhd=1):
     # plot spectrum
     if do_mhd:
-        plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['EM'],
+        plt.loglog(S['kgrid'][1:], S['EK'][1:], S['kgrid'][1:], S['EM'][1:],
                    S['kgrid'], S['kgrid']**(-5/3), ':')
         plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
     else:
@@ -106,8 +108,8 @@ def plot_spectrum(S, plot_title, do_mhd=1):
     plt.xlabel(r'$k$')
     plt.ylabel(r'$E_K$')
     plt.title('Energy  Spectrum: ' + plot_title)
-    plt.show()
-    # save figure
+    plt.savefig(FIG_PATH + fname + '/' + fname + '_spec.png')
+    plt.clf()
 
 
 def spect1D(v1, v2, K, kgrid):

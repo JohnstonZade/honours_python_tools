@@ -2,6 +2,7 @@
    density functions for fluid simulations.
 '''
 import glob
+import os
 import pickle
 import numpy as np
 import numpy.fft as fft
@@ -9,7 +10,11 @@ import matplotlib.pyplot as plt
 from athena_read import athdf, hst
 from math import pi
 from matplotlib import rc
+
 rc('text', usetex=True)  # LaTeX labels
+PATH = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+FIG_PATH = PATH + 'figs/'
+# PATH = Thunderbird (won't use)
 
 
 def load_data(fname, n):
@@ -20,14 +25,8 @@ def load_data(fname, n):
     def f(n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
-    # Seagate
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-
-    # Thunderbird
-    # folder = '/data/johza721/output/MHDTurb/'
-
     # Input
-    folder += fname + '/Turb'  # Name of output
+    folder = PATH + fname + '/Turb'  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
     return athdf(filename)
@@ -37,10 +36,7 @@ def load_hst(fname):
     '''Loads data from .hst files output from Athena++, using modules
     from the athena_read code.
     '''
-    # Seagate
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-
-    hstLoc = folder + fname + '/Turb.hst'
+    hstLoc = PATH + fname + '/Turb.hst'
     return hst(hstLoc)
 
 
@@ -63,6 +59,15 @@ def save_dict(dict, fname=''):
     output = open(file, 'wb')
     pickle.dump(dict, output)
     output.close()
+
+
+def make_folder(fname):
+    if not os.path.exists(fname):
+        os.mkdir(fname)
+
+
+def get_maxn(fname):
+    return len(glob.glob(PATH+fname+'/*.athdf'))
 
 
 # --- VECTOR FUNCTIONS --- #
@@ -111,9 +116,8 @@ def get_rms(fname, n, do_mhd):
 
 
 def plot_rms(fname, do_mhd=1):
-    folder = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
-    filename = folder + fname
-    n_max = len(glob.glob(filename+'/*.athdf'))
+    filename = FIG_PATH + fname
+    n_max = len(glob.glob(PATH+fname+'/*.athdf'))
 
     T, V, B = [], [], []
     for i in range(n_max):
@@ -130,11 +134,10 @@ def plot_rms(fname, do_mhd=1):
     plt.ylabel(r'$\delta_{\perp \textrm{, rms}}$')
     plt.legend([r'$\delta u_{\perp}$', r'$\delta B_{\perp}$',
                 r'$\delta u_{\perp}$ mean', r'$\delta B_{\perp}$ mean'])
-    plt.savefig('animate/' + fname + '/' + fname + '_fluc.png')
+    plt.savefig(filename + '/' + fname + '_fluc.png')
     plt.clf()
 
 
-# TODO: implement saving plot
 def plot_energy_evo(fname, plot_title='test'):
 
     def get_vol(fname):
@@ -155,6 +158,13 @@ def plot_energy_evo(fname, plot_title='test'):
     TE = hstData['tot-E'] / vol                     # thermal energy
     norm = 1
     plt.semilogy(t, KE/norm, t, ME/norm, t, TE/norm)
+    plt.title('Time Evolution of Energy: ' + plot_title)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Energy')
+    plt.legend([r'$E_K$: Kinetic Energy', r'$E_B$: Magnetic Energy',
+                r'$E_T$: Thermal Energy'])
+    plt.savefig(FIG_PATH + fname + '/' + fname + '_evo.png')
+    plt.clf()
 
 
 # TODO: implement calculation
@@ -188,7 +198,6 @@ def prlshear_pdf(fname, n):
     # plot histogram
 
 
-# TODO: make independent function
 def prlshearft_pdf(fname, n):
 
     def dv(i, j):
@@ -225,9 +234,12 @@ def prlshearft_pdf(fname, n):
 
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     plt.yscale('log', nonposy='clip')
+    # plt.title('PDF for bb:Gu with [CALCULATE AND ADD PARAMETERS HERE]')
     plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
     plt.ylabel(r'$\mathcal{P}$')
-    # plt.title('PDF for bb:Gu with [CALCULATE AND ADD PARAMETERS HERE]')
+    plt.savefig(FIG_PATH + fname + '/' + fname + '_pdf.png')
+    plt.clf()
+
 
 # --- FOURIER FUNCTIONS --- #
 

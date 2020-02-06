@@ -7,7 +7,7 @@ import glob
 import os
 from natsort import natsorted
 from structure_function import structure_function
-from diagnostics import plot_rms
+from diagnostics import get_maxn, make_folder, plot_rms
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
@@ -21,10 +21,9 @@ path = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
 # Where the .png files are output
 filename = path + 'figs/' + fname
 mhd = 'mhd' in fname or 'cgl' in fname
-max_n = len(glob.glob(path+fname+'/*.athdf'))
+max_n = get_maxn(fname)
 
-if not os.path.exists('animate/' + fname):
-    os.mkdir('animate/' + fname)
+make_folder(path+fname)
 
 print('Reading images from', filename)
 if do_delete:
@@ -49,7 +48,7 @@ def animate_struct():
     for image in struct:
         struct_ims.append(imageio.imread(image))
 
-    imageio.mimsave('animate/' + fname + '/' + fname + '_struct.gif',
+    imageio.mimsave('output/' + fname + '/' + fname + '_struct.gif',
                     struct_ims, duration=0.2)
 
 
@@ -64,9 +63,9 @@ def animate_mhd():
     for image in perp:
         perp_ims.append(imageio.imread(image))
 
-    imageio.mimsave('animate/' + fname + '/' + fname + '_parl.gif', parl_ims,
+    imageio.mimsave('output/' + fname + '/' + fname + '_parl.gif', parl_ims,
                     duration=0.2)
-    imageio.mimsave('animate/' + fname + '/' + fname + '_perp.gif', perp_ims,
+    imageio.mimsave('output/' + fname + '/' + fname + '_perp.gif', perp_ims,
                     duration=0.2)
 
 
