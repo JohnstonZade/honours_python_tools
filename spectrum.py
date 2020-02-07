@@ -4,11 +4,12 @@
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from diagnostics import ft_grid, get_maxn, load_data, load_dict, load_hst
-from diagnostics import save_dict, FIG_PATH
+from diagnostics import check_dict, ft_grid, get_maxn, load_data, load_dict
+from diagnostics import load_hst, save_dict, FIG_PATH
+from matplotlib import rc
+rc('text', usetex=True)  # LaTeX labels
 
-
-def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
+def calc_spectrum(fname, plot_title='test', do_mhd=1):
 
     # Getting turnover time and converting to file number
     # As for the moment only simulating continuously forced turbulence,
@@ -16,7 +17,7 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1, do_full_calc=1):
     max_n = get_maxn(fname)
     tau_file = int(max_n/2)
     nums = range(tau_file, max_n)
-
+    do_full_calc = not check_dict(fname)
     if do_full_calc:
         # create grid of K from first time step
 

@@ -14,6 +14,7 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 PATH = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
 FIG_PATH = PATH + 'figs/'
+DICT_PATH = PATH + 'pickle/'
 # PATH = Thunderbird (won't use)
 
 
@@ -45,7 +46,7 @@ def load_dict(fname=''):
     if fname != '':
         file = fname + '_' + file
 
-    pkl_file = open(file, 'rb')
+    pkl_file = open(DICT_PATH+file, 'rb')
     dict = pickle.load(pkl_file)
     pkl_file.close()
     return dict
@@ -56,9 +57,13 @@ def save_dict(dict, fname=''):
     if fname != '':
         file = fname + '_' + file
 
-    output = open(file, 'wb')
+    output = open(DICT_PATH+file, 'wb')
     pickle.dump(dict, output)
     output.close()
+
+
+def check_dict(fname):
+    return os.path.isfile(DICT_PATH+fname+'_S_dict.pkl')
 
 
 def make_folder(fname):
@@ -167,9 +172,27 @@ def plot_energy_evo(fname, plot_title='test'):
     plt.clf()
 
 
-# TODO: implement calculation
 def It_Brag(fname):
-    It = 1
+    '''Code to calculate the It_Brag parameter as described in Jono's
+    magneto-immutable turbulence paper. ρ and v_A are assumed to be 1.
+    Relavant regimes:
+        It_Brag < 1 ⟹ Δp ~ B^2
+        It_Brag > 1 ⟹ Δp ≪ B^2
+    '''
+    data = load_data(fname, 0)
+    # length of box ∥ to B-field, assumed to be in x-direction
+    l_prl = abs(data['RootGridX1'][1] - data['RootGridX1'][0])
+    # length of box ⟂ to B-field, y- and z- lengths assumed to be the same.
+    l_prp = abs(data['RootGridX2'][1] - data['RootGridX2'][0])
+
+    # pprp and pprl are set to p_0 initially over the box
+    p_0 = data['pprp'][0, 0, 0]
+    # Convention: putting ν_c (nuc) value at end of file name
+    x = fname.rfind('nuc') + 3
+    ν_c = float(fname[x:])
+
+    # (δB⟂/B0) = (L⟂/L∥)
+    It = (l_prl*ν_c / p_0) * (l_prp / l_prl)**(-2)
     return It
 
 
@@ -177,7 +200,7 @@ def It_Brag(fname):
 
 
 # TODO: focus on getting working
-def prlshear_pdf(fname, n):
+def prlshear_pdf(fname, n, plot_title=''):
     # pprp and pprl are set to p_0 initially over the box
     p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
     # Convention: putting ν_c (nuc) value at end of file name
@@ -196,9 +219,16 @@ def prlshear_pdf(fname, n):
 
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     # plot histogram
+    plt.yscale('log', nonposy='clip')
+    plt.title(r'PDF of $\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
+              + plot_title)
+    plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
+    plt.ylabel(r'$\mathcal{P}$')
+    plt.savefig(FIG_PATH + fname + '/' + fname + '_pdfnum.png')
+    plt.clf()
 
 
-def prlshearft_pdf(fname, n):
+def prlshearft_pdf(fname, n, plot_title=''):
 
     def dv(i, j):
         '''Calculates gradient of the components of vel_data using FFT.'''
@@ -234,7 +264,8 @@ def prlshearft_pdf(fname, n):
 
     n, bins, patches = plt.hist(prlshear, 100, density=True)
     plt.yscale('log', nonposy='clip')
-    # plt.title('PDF for bb:Gu with [CALCULATE AND ADD PARAMETERS HERE]')
+    plt.title(r'PDF (using Fourier method) of '
+              + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with ' + plot_title)
     plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
     plt.ylabel(r'$\mathcal{P}$')
     plt.savefig(FIG_PATH + fname + '/' + fname + '_pdf.png')

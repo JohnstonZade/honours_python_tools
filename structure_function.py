@@ -1,5 +1,4 @@
 '''Code to calculate structure function of a fluid simulation.'''
-import os
 import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
@@ -107,7 +106,6 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
 
 
 def plot_MHD(l, t, titles, vels, Bs, fname):
-    # Seagate
     filename = FIG_PATH + fname
 
     for i in range(len(titles)):
