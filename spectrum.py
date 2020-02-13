@@ -35,7 +35,7 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1):
 
         # Count the number of modes in each bin to normalize later -- this
         # gives a smoother result, as we want the average energy in each bin.
-        # TODO: check where this is used
+        # This isn't usually used, but will keep it in case it is needed.
         oneGrid = np.ones(KX.shape)
         S['nbin'] = spect1D(oneGrid, oneGrid, Kspec, kgrid)*np.size(oneGrid)**2
         S['nnorm'] = S['nbin']/S['kgrid']**2

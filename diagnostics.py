@@ -7,6 +7,7 @@ import pickle
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
+import seaborn as sns
 from athena_read import athdf, hst
 from math import pi
 from matplotlib import rc
@@ -199,8 +200,7 @@ def It_Brag(fname):
 # --- bb:∇u PDF FUNCTIONS --- #
 
 
-# TODO: focus on getting working
-def prlshear_pdf(fname, n, plot_title=''):
+def prlshear_pdf(fname, n, plot_title='', do_plot=1):
     # pprp and pprl are set to p_0 initially over the box
     p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
     # Convention: putting ν_c (nuc) value at end of file name
@@ -217,18 +217,23 @@ def prlshear_pdf(fname, n, plot_title=''):
     μ_Brag = p_0/ν_c
     prlshear = Δp/μ_Brag  # bb:grad u
 
-    n, bins, patches = plt.hist(prlshear, 100, density=True)
-    # plot histogram
-    plt.yscale('log', nonposy='clip')
-    plt.title(r'PDF of $\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
-              + plot_title)
-    plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
-    plt.ylabel(r'$\mathcal{P}$')
-    plt.savefig(FIG_PATH + fname + '/' + fname + '_pdfnum.png')
-    plt.clf()
+    if do_plot:
+        n, bins, patches = plt.hist(prlshear, 100, density=True)
+        plt.clf()
+        # plot histogram
+        plt.plot(0.5*(bins[:-1] + bins[1:]), n)
+        plt.yscale('log', nonposy='clip')
+        plt.title(r'PDF of $\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
+                  + plot_title)
+        plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
+        plt.ylabel(r'$\mathcal{P}$')
+        plt.savefig(FIG_PATH + fname + '/' + fname + '_pdfnum.png')
+        plt.clf()
+    else:
+        return prlshear
 
 
-def prlshearft_pdf(fname, n, plot_title=''):
+def prlshearft_pdf(fname, n, plot_title='', do_plot=1):
 
     def dv(i, j):
         '''Calculates gradient of the components of vel_data using FFT.'''
@@ -260,16 +265,18 @@ def prlshearft_pdf(fname, n, plot_title=''):
     for i in range(3):
         for j in range(3):
             prlshear += b[:, i]*b[:, j]*dv(i, j).flatten()
-    prlshear *= 4*pi/B2avg
 
-    n, bins, patches = plt.hist(prlshear, 100, density=True)
-    plt.yscale('log', nonposy='clip')
-    plt.title(r'PDF (using Fourier method) of '
-              + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with ' + plot_title)
-    plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
-    plt.ylabel(r'$\mathcal{P}$')
-    plt.savefig(FIG_PATH + fname + '/' + fname + '_pdf.png')
-    plt.clf()
+    if do_plot:
+        n, bins, patches = plt.hist(prlshear, 100, density=True)
+        plt.yscale('log', nonposy='clip')
+        plt.title(r'PDF (using Fourier method) of '
+                  + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with ' + plot_title)
+        plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
+        plt.ylabel(r'$\mathcal{P}$')
+        plt.savefig(FIG_PATH + fname + '/' + fname + '_pdf.png')
+        plt.clf()
+    else:
+        return prlshear, B2avg
 
 
 # --- FOURIER FUNCTIONS --- #

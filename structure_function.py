@@ -73,7 +73,7 @@ def get_l_perp(L1, L2, l, B):
     # Dot product of unit vectors to get cos(θ)
     cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
     θ_data = np.arccos(cθ)
-    θ = np.linspace(0, 90, 4, endpoint=True)  # 7 default
+    θ = np.linspace(0, 90, 10, endpoint=True)  # 7 default
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
@@ -108,7 +108,9 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
 def plot_MHD(l, t, titles, vels, Bs, fname):
     filename = FIG_PATH + fname
 
-    for i in range(len(titles)):
+    # for i in range(len(titles)):
+    # gets parallel and perp components
+    for i in [0, len(titles)-1]:
         plt.loglog(l, vels[i], l, Bs[i])
         plt.loglog(l, l**(2/3), ':', l, l, ':')
         plt.title(r'$S_2(l)$ with ' + titles[i])
