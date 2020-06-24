@@ -13,13 +13,13 @@ from math import pi
 from matplotlib import rc
 
 rc('text', usetex=True)  # LaTeX labels
-PATH = '/media/zade/Seagate Expansion Drive/Summer_Project_2019/'
+PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 FIG_PATH = PATH + 'figs/'
 DICT_PATH = PATH + 'pickle/'
 # PATH = Thunderbird (won't use)
 
 
-def load_data(fname, n):
+def load_data(fname, n, problem='Turb'):
     '''Loads data from .athdf files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -28,7 +28,7 @@ def load_data(fname, n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Input
-    folder = PATH + fname + '/Turb'  # Name of output
+    folder = PATH + fname + '/' + problem  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
     return athdf(filename)

@@ -23,7 +23,7 @@ def generate_points(grid, N):
 
 
 def select_y(x, x_bin, y, i, mask=[], use_mask=0, return_mask=0):
-    '''Selects and averages the y vector values with the condition that
+    '''Selects the y vector values with the condition that
     the corresponding x values satisfy x_bin[i] <= x <= x_bin[i+1].
 
     If a mask is provided, it is used on both x and y so that the order of
