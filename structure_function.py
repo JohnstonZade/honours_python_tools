@@ -3,7 +3,7 @@ import numpy as np
 from numpy.random import randint, random
 import matplotlib.pyplot as plt
 from matplotlib import rc
-from diagnostics import get_mag, get_unit, get_vec, load_data, FIG_PATH
+import diagnostics as diag
 rc('text', usetex=True)  # LaTeX labels
 
 
@@ -66,19 +66,19 @@ def get_l_perp(L1, L2, l, B):
     structure function to be calculated.
     '''
     # Calculate average B field between point pairs
-    B1_vec = np.array([get_vec(B, p) for p in L1])
-    B2_vec = np.array([get_vec(B, p) for p in L2])
+    B1_vec = np.array([diag.get_vec(B, p) for p in L1])
+    B2_vec = np.array([diag.get_vec(B, p) for p in L2])
     B_mean = 0.5*(B1_vec + B2_vec)
 
     # Dot product of unit vectors to get cos(θ)
-    cθ = abs(np.sum(get_unit(B_mean)*get_unit(l), axis=1))
+    cθ = abs(np.sum(diag.get_unit(B_mean)*diag.get_unit(l), axis=1))
     θ_data = np.arccos(cθ)
     θ = np.linspace(0, 90, 10, endpoint=True)  # 7 default
     θlen = len(θ) - 1
     θ_rad = (np.pi/180)*θ
 
     # Create l_mask depending on θ
-    l_mask = [select_y(θ_data, θ_rad, get_mag(l), i, return_mask=1)
+    l_mask = [select_y(θ_data, θ_rad, diag.get_mag(l), i, return_mask=1)
               for i in range(θlen)]
     return θ, l_mask
 
@@ -88,10 +88,10 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
     # Get vectors v1, v2 at each point
     # Calculate Δv2 = abs(v1 - v2)**2
     # We now have a mapping of l to Δv2 <- structure function
-    v1_vec = np.array([get_vec(v, p) for p in L1])
-    v2_vec = np.array([get_vec(v, p) for p in L2])
+    v1_vec = np.array([diag.get_vec(v, p) for p in L1])
+    v2_vec = np.array([diag.get_vec(v, p) for p in L2])
     Δv_vec = v1_vec - v2_vec
-    Δv_mag2 = get_mag(Δv_vec)**2
+    Δv_mag2 = diag.get_mag(Δv_vec)**2
 
     # Bin and plot structure function
     # Plot in the middle of the bin points otherwise the size of arrays
@@ -106,7 +106,7 @@ def calc_struct(L1, L2, v, l_mag, L_max, mask=[], use_mask=0):
 
 
 def plot_MHD(l, t, titles, vels, Bs, fname):
-    filename = FIG_PATH + fname
+    filename = diag.PATH + fname
 
     # for i in range(len(titles)):
     # gets parallel and perp components
@@ -123,7 +123,7 @@ def plot_MHD(l, t, titles, vels, Bs, fname):
 
 
 def plot_struct(l_grid, v_avg, t, fname):
-    filename = FIG_PATH + fname
+    filename = diag.PATH + fname
 
     plt.loglog(l_grid, v_avg, l_grid, l_grid**(2/3), ':')
     plt.title(r'$S_2(l)$ at $t=$ ' + t)
@@ -148,7 +148,7 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0):
         return np.array([zz[tp], yy[tp], xx[tp]])
 
     # Read in data and set up grid
-    data = load_data(fname, n)
+    data = diag.load_data(fname, n)
     # Following (z, y, x) convention from athena_read
     grid = data['RootGridSize'][::-1]
     t = '{:.1f}'.format(data['Time']) + ' s'
@@ -167,7 +167,7 @@ def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0):
     x2_vec = np.array([get_point(p) for p in L2])
     l_vec = x1_vec - x2_vec
     # Find distance between each pair of points
-    l_mag = get_mag(l_vec)
+    l_mag = diag.get_mag(l_vec)
     # Maximum box side length for making l_grid in calc_struct()
     L = np.max(get_length())
     print('Lengths calculated')

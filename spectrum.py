@@ -4,25 +4,25 @@
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-from diagnostics import check_dict, ft_grid, get_maxn, load_data, load_dict
-from diagnostics import load_hst, save_dict, FIG_PATH
+import diagnostics as diag
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
+
 
 def calc_spectrum(fname, plot_title='test', do_mhd=1):
 
     # Getting turnover time and converting to file number
     # As for the moment only simulating continuously forced turbulence,
     # will start from halfway through the sim to the end.
-    max_n = get_maxn(fname)
+    max_n = diag.get_maxn(fname)
     tau_file = int(max_n/2)
     nums = range(tau_file, max_n)
-    do_full_calc = not check_dict(fname)
+    do_full_calc = not diag.check_dict(fname)
     if do_full_calc:
         # create grid of K from first time step
 
-        data = load_data(fname, tau_file)
-        (KX, KY, KZ), kgrid = ft_grid(data, 1)
+        data = diag.load_data(fname, tau_file)
+        (KX, KY, KZ), kgrid = diag.ft_grid(data, 1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
         Kmag = np.sqrt(Kprl**2+Kperp**2)
@@ -55,7 +55,7 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1):
 
         for n in nums:
             try:
-                data = load_data(fname, n)
+                data = diag.load_data(fname, n)
             except IOError:
                 print('Could not load file', n)
                 break
@@ -90,9 +90,9 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1):
             S[var] /= ns
         S['nums'] = nums
 
-        save_dict(S, fname)
+        diag.save_dict(S, fname)
     else:
-        S = load_dict(fname)
+        S = diag.load_dict(fname)
 
     plot_spectrum(S, fname, plot_title, do_mhd)
 
@@ -109,7 +109,7 @@ def plot_spectrum(S, fname, plot_title, do_mhd=1):
     plt.xlabel(r'$k$')
     plt.ylabel(r'$E_K$')
     plt.title('Energy  Spectrum: ' + plot_title)
-    plt.savefig(FIG_PATH + fname + '/' + fname + '_spec.png')
+    plt.savefig(diag.PATH + fname + '/' + fname.split()[-1] + '_spec.png')
     plt.clf()
 
 
@@ -130,7 +130,7 @@ def spect1D(v1, v2, K, kgrid):
 
 # TODO: work on making more general, check against MATLAB
 def get_turnover_time(fname, do_decay):
-    hstData = load_hst(fname)
+    hstData = diag.load_hst(fname)
     KEx, KEy, KEz = hstData['1-KE'], hstData['2-KE'], hstData['3-KE']
 
     u_L = 0.

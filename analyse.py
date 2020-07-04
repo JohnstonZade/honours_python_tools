@@ -12,9 +12,6 @@ def analyse(fname, do_title=1):
     else:
         plot_title = 'test'
 
-    fig_path = diag.FIG_PATH + fname
-    diag.make_folder(fig_path)
-
     # Default analyse at (total sim time)/2 as am focusing on
     # continuously forced turbulence at the moment
     max_n = diag.get_maxn(fname)

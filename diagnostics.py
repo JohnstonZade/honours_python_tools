@@ -13,10 +13,9 @@ from math import pi
 from matplotlib import rc
 
 rc('text', usetex=True)  # LaTeX labels
-PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
-FIG_PATH = PATH + 'figs/'
+# PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
+PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 DICT_PATH = PATH + 'pickle/'
-# PATH = Thunderbird (won't use)
 
 
 def load_data(fname, n, problem='Turb'):
@@ -34,11 +33,11 @@ def load_data(fname, n, problem='Turb'):
     return athdf(filename)
 
 
-def load_hst(fname):
+def load_hst(fname, problem='Turb'):
     '''Loads data from .hst files output from Athena++, using modules
     from the athena_read code.
     '''
-    hstLoc = PATH + fname + '/Turb.hst'
+    hstLoc = PATH + fname + '/' + problem + '.hst'
     return hst(hstLoc)
 
 
@@ -122,8 +121,7 @@ def get_rms(fname, n, do_mhd):
 
 
 def plot_rms(fname, do_mhd=1):
-    filename = FIG_PATH + fname
-    n_max = len(glob.glob(PATH+fname+'/*.athdf'))
+    n_max = get_maxn(fname)
 
     T, V, B = [], [], []
     for i in range(n_max):
@@ -140,7 +138,7 @@ def plot_rms(fname, do_mhd=1):
     plt.ylabel(r'$\delta_{\perp \textrm{, rms}}$')
     plt.legend([r'$\delta u_{\perp}$', r'$\delta B_{\perp}$',
                 r'$\delta u_{\perp}$ mean', r'$\delta B_{\perp}$ mean'])
-    plt.savefig(filename + '/' + fname + '_fluc.png')
+    plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_fluc.pdf')
     plt.clf()
 
 
@@ -169,7 +167,7 @@ def plot_energy_evo(fname, plot_title='test'):
     plt.ylabel('Energy')
     plt.legend([r'$E_K$: Kinetic Energy', r'$E_B$: Magnetic Energy',
                 r'$E_T$: Thermal Energy'])
-    plt.savefig(FIG_PATH + fname + '/' + fname + '_evo.png')
+    plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_evo.pdf')
     plt.clf()
 
 
@@ -227,7 +225,7 @@ def prlshear_pdf(fname, n, plot_title='', do_plot=1):
                   + plot_title)
         plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
         plt.ylabel(r'$\mathcal{P}$')
-        plt.savefig(FIG_PATH + fname + '/' + fname + '_pdfnum.png')
+        plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdfnum.pdf')
         plt.clf()
     else:
         return prlshear
@@ -273,7 +271,7 @@ def prlshearft_pdf(fname, n, plot_title='', do_plot=1):
                   + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with ' + plot_title)
         plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
         plt.ylabel(r'$\mathcal{P}$')
-        plt.savefig(FIG_PATH + fname + '/' + fname + '_pdf.png')
+        plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdf.pdf')
         plt.clf()
     else:
         return prlshear, B2avg
