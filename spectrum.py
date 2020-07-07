@@ -9,7 +9,7 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 
 
-def calc_spectrum(fname, plot_title='test', do_mhd=1):
+def calc_spectrum(fname, prob='Turb', plot_title='test', do_mhd=1):
 
     # Getting turnover time and converting to file number
     # As for the moment only simulating continuously forced turbulence,
@@ -21,7 +21,7 @@ def calc_spectrum(fname, plot_title='test', do_mhd=1):
     if do_full_calc:
         # create grid of K from first time step
 
-        data = diag.load_data(fname, tau_file)
+        data = diag.load_data(fname, tau_file, prob)
         (KX, KY, KZ), kgrid = diag.ft_grid(data, 1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)

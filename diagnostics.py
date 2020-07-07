@@ -16,9 +16,10 @@ rc('text', usetex=True)  # LaTeX labels
 # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 DICT_PATH = PATH + 'pickle/'
+REGIMES = ['collisionless', 'braginskii with heat fluxes', 'braginskii']
 
 
-def load_data(fname, n, problem='Turb'):
+def load_data(fname, n, prob='Turb'):
     '''Loads data from .athdf files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -27,17 +28,17 @@ def load_data(fname, n, problem='Turb'):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Input
-    folder = PATH + fname + '/' + problem  # Name of output
+    folder = PATH + fname + '/' + prob  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
     return athdf(filename)
 
 
-def load_hst(fname, problem='Turb'):
+def load_hst(fname, prob='Turb'):
     '''Loads data from .hst files output from Athena++, using modules
     from the athena_read code.
     '''
-    hstLoc = PATH + fname + '/' + problem + '.hst'
+    hstLoc = PATH + fname + '/' + prob + '.hst'
     return hst(hstLoc)
 
 
@@ -78,6 +79,15 @@ def get_maxn(fname):
 # --- VECTOR FUNCTIONS --- #
 
 
+def pnts(p):
+    points = []
+    for zz in range(p[0]):
+        for yy in range(p[1]):
+            for xx in range(p[2]):
+                points.append((zz, yy, xx))
+    return np.array(points)
+
+
 def get_mag(X):
     '''Returns the magnitude of the given vector.'''
     x = np.array(X)
@@ -97,6 +107,14 @@ def get_vec(v, p):
     v2 = v[1][tp]  # y-component
     v3 = v[2][tp]  # z-component
     return np.array([v1, v2, v3])
+
+
+def get_vol(fname, prob='Turb'):
+    data = load_data(fname, 0, prob)
+    X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
+    X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
+    X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
+    return abs(X1*X2*X3)  # just a check to make volume positive
 
 
 # --- RMS FUNCTIONS  --- #
@@ -143,14 +161,6 @@ def plot_rms(fname, do_mhd=1):
 
 
 def plot_energy_evo(fname, plot_title='test'):
-
-    def get_vol(fname):
-        data = load_data(fname, 0)
-        X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
-        X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
-        X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
-        return abs(X1*X2*X3)  # just a check to make volume positive
-
     hstData = load_hst(fname)
     vol = get_vol(fname)
     t = hstData['time']
@@ -170,15 +180,17 @@ def plot_energy_evo(fname, plot_title='test'):
     plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_evo.pdf')
     plt.clf()
 
+# --- DIMENSIONLESS PARAMETER CALCULATIONS --- #
 
-def It_Brag(fname):
+
+def It_Brag(fname, nu_c, prob='Turb'):
     '''Code to calculate the It_Brag parameter as described in Jono's
     magneto-immutable turbulence paper. ρ and v_A are assumed to be 1.
     Relavant regimes:
         It_Brag < 1 ⟹ Δp ~ B^2
         It_Brag > 1 ⟹ Δp ≪ B^2
     '''
-    data = load_data(fname, 0)
+    data = load_data(fname, 0, prob)
     # length of box ∥ to B-field, assumed to be in x-direction
     l_prl = abs(data['RootGridX1'][1] - data['RootGridX1'][0])
     # length of box ⟂ to B-field, y- and z- lengths assumed to be the same.
@@ -186,14 +198,61 @@ def It_Brag(fname):
 
     # pprp and pprl are set to p_0 initially over the box
     p_0 = data['pprp'][0, 0, 0]
-    # Convention: putting ν_c (nuc) value at end of file name
-    x = fname.rfind('nuc') + 3
-    ν_c = float(fname[x:])
 
     # (δB⟂/B0) = (L⟂/L∥)
-    It = (l_prl*ν_c / p_0) * (l_prp / l_prl)**(-2)
+    It = (l_prl*nu_c / p_0) * (l_prp / l_prl)**(-2)
     return It
 
+
+def beta(p0, B0):
+    return 2*p0/(B0**2)
+
+
+def db_int(nu_c, omega_A, beta):
+    # Assumes v_A = 1, which is true when B0 and ρ=1.
+    regime = find_regime(nu_c, omega_A, beta)
+    if regime == 0:  # collisionless
+        return 1/np.sqrt(beta)
+    else:
+        return np.sqrt(nu_c/(omega_A*beta))
+
+
+def find_regime(nu_c, omega_A, beta):
+    eta =  nu_c / omega_A
+    if eta < 1:
+        return 0  # collisionless
+    elif eta < np.sqrt(beta):
+        return 1  # brag with heat fluxes
+    else:
+        return 2  # brag
+
+
+def calc_omega_A(Lx):
+    # Assumes background magnetic field along the x axis and v_A = 1 (B0=1,ρ=1)
+    # Then k_∥ = 2π/Lx and ω_A = k_∥v_A = 2π/Lx
+    return 2*np.pi / Lx
+
+def avg_B(fname, n, background, prob='Turb'):
+    data = load_data(fname, n, prob)
+    return avg_B_data(data, background)
+
+
+def avg_B_data(data, background):
+    grid = data['RootGridSize'][::-1]
+    points = pnts(grid)
+
+    if background:
+        # magnitude squared of the background magnetic field
+        # assuming perturbation is in the z direction
+        # this is true for Alfven waves with k and B0 in the xy plane
+        # as perturbation must be in the k×B0 = z direction
+        B_data = (data['Bcc1'], data['Bcc2'], np.zeros_like(data['Bcc3']))
+    else:
+        # average value of B2 over the whole region
+        B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
+    B_vec = np.array([get_vec(B_data, p) for p in points])
+    B_avg = np.mean(get_mag(B_vec))  # spatial average of B
+    return B_avg
 
 # --- bb:∇u PDF FUNCTIONS --- #
 
@@ -236,14 +295,6 @@ def prlshearft_pdf(fname, n, plot_title='', do_plot=1):
     def dv(i, j):
         '''Calculates gradient of the components of vel_data using FFT.'''
         return np.real(fft.ifftn(K[i]*fft.fftn(vel_data[j])))
-
-    def pnts(p):
-        points = []
-        for zz in range(p[0]):
-            for yy in range(p[1]):
-                for xx in range(p[2]):
-                    points.append((zz, yy, xx))
-        return np.array(points)
 
     # ft stuff
     data = load_data(fname, n)
