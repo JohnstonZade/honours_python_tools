@@ -7,7 +7,8 @@ import pickle
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
+from pathlib import Path
 from athena_read import athdf, hst
 from math import pi
 from matplotlib import rc
@@ -17,9 +18,10 @@ rc('text', usetex=True)  # LaTeX labels
 PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 DICT_PATH = PATH + 'pickle/'
 REGIMES = ['collisionless', 'braginskii with heat fluxes', 'braginskii']
+DEFAULT_PROB = 'shear_alfven'
 
 
-def load_data(fname, n, prob='Turb'):
+def load_data(fname, n, prob=DEFAULT_PROB):
     '''Loads data from .athdf files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -34,7 +36,7 @@ def load_data(fname, n, prob='Turb'):
     return athdf(filename)
 
 
-def load_hst(fname, prob='Turb'):
+def load_hst(fname, prob=DEFAULT_PROB):
     '''Loads data from .hst files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -69,7 +71,8 @@ def check_dict(fname):
 
 def make_folder(fname):
     if not os.path.exists(fname):
-        os.mkdir(fname)
+        path = Path(fname)
+        path.mkdir(parents=True, exist_ok=True)
 
 
 def get_maxn(fname):
@@ -109,7 +112,7 @@ def get_vec(v, p):
     return np.array([v1, v2, v3])
 
 
-def get_vol(fname, prob='Turb'):
+def get_vol(fname, prob=DEFAULT_PROB):
     data = load_data(fname, 0, prob)
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
@@ -160,30 +163,10 @@ def plot_rms(fname, do_mhd=1):
     plt.clf()
 
 
-def plot_energy_evo(fname, plot_title='test'):
-    hstData = load_hst(fname)
-    vol = get_vol(fname)
-    t = hstData['time']
-    # tau = get_turnover_time(fname, 0)[0]
-    # t /= tau
-
-    KE = (hstData['2-KE'] + hstData['3-KE']) / vol  # kinetic energy
-    ME = (hstData['2-ME'] + hstData['3-ME']) / vol  # magnetic energy
-    TE = hstData['tot-E'] / vol                     # thermal energy
-    norm = 1
-    plt.semilogy(t, KE/norm, t, ME/norm, t, TE/norm)
-    plt.title('Time Evolution of Energy: ' + plot_title)
-    plt.xlabel('Time (s)')
-    plt.ylabel('Energy')
-    plt.legend([r'$E_K$: Kinetic Energy', r'$E_B$: Magnetic Energy',
-                r'$E_T$: Thermal Energy'])
-    plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_evo.pdf')
-    plt.clf()
-
 # --- DIMENSIONLESS PARAMETER CALCULATIONS --- #
 
 
-def It_Brag(fname, nu_c, prob='Turb'):
+def It_Brag(fname, nu_c, prob=DEFAULT_PROB):
     '''Code to calculate the It_Brag parameter as described in Jono's
     magneto-immutable turbulence paper. ρ and v_A are assumed to be 1.
     Relavant regimes:
@@ -232,7 +215,8 @@ def calc_omega_A(Lx):
     # Then k_∥ = 2π/Lx and ω_A = k_∥v_A = 2π/Lx
     return 2*np.pi / Lx
 
-def avg_B(fname, n, background, prob='Turb'):
+
+def avg_B(fname, n, background, prob=DEFAULT_PROB):
     data = load_data(fname, n, prob)
     return avg_B_data(data, background)
 
@@ -319,7 +303,8 @@ def prlshearft_pdf(fname, n, plot_title='', do_plot=1):
         n, bins, patches = plt.hist(prlshear, 100, density=True)
         plt.yscale('log', nonposy='clip')
         plt.title(r'PDF (using Fourier method) of '
-                  + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with ' + plot_title)
+                  + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
+                  + plot_title)
         plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
         plt.ylabel(r'$\mathcal{P}$')
         plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdf.pdf')

@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import diagnostics as diag
 from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
+default_prob = diag.DEFAULT_PROB
 
-
-def calc_spectrum(fname, prob='Turb', plot_title='test', do_mhd=1):
+def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
 
     # Getting turnover time and converting to file number
     # As for the moment only simulating continuously forced turbulence,

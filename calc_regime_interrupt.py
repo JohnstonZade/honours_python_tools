@@ -1,8 +1,8 @@
 import numpy as np
 import diagnostics as diag
+default_prob = diag.DEFAULT_PROB
 
-
-def calculate(output, fname, nu, B_prp, p_0, Lx, prob='shear_alfven'):
+def calculate(output, fname, nu, B_prp, p_0, Lx=1.0, prob=default_prob):
     assert nu >= 0, 'nu should be non-negative'
 
     # assuming ω_A is always set to 1
@@ -21,7 +21,9 @@ def calculate(output, fname, nu, B_prp, p_0, Lx, prob='shear_alfven'):
     interrupt_limit = 'will' if db >= db_int else 'will not'
 
     # write to text file and save
-    f_inputs = 'Inputs: \n Collision Frequency nu_c: ' + str(nu) + '\n B_perp: '\
+    f_inputs = 'Inputs: \n Collision Frequency ν_c: ' + str(nu)\
+               + '\n Alfven frequency ω_A: ' + str(omega_A)\
+               + '\n ν_c / ω_A: ' + str(nu/omega_A) + '\n B_prp: '\
                + str(B_prp) + '\n Inital Pressure p_0: ' + str(p_0) + '\n \n'
     f_beta = 'β = ' + str(beta) + '\nδb = ' + str(db) + '\n√β = ' + str(np.sqrt(beta))\
              + '\nδb_int = ' + str(db_int) + '\n'
