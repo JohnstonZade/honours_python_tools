@@ -2,7 +2,9 @@ import numpy as np
 import diagnostics as diag
 
 
-def calculate(output, fname, nu, B_prp, p_0, Lx, prob='shear_alfven'):
+def calculate(output, fname, nu, B_prp, p_0, Ly, Lx=1.0,
+              prob='shear_alfven',
+              vel_pert=0):
     assert nu >= 0, 'nu should be non-negative'
 
     # assuming ω_A is always set to 1
@@ -18,17 +20,20 @@ def calculate(output, fname, nu, B_prp, p_0, Lx, prob='shear_alfven'):
     omega_A = diag.calc_omega_A(Lx)
     regime = diag.find_regime(nu, omega_A, beta)
     db_int = diag.db_int(nu, omega_A, beta)
+    db_int *= 2.5 if vel_pert else 1.0
     interrupt_limit = 'will' if db >= db_int else 'will not'
 
     # write to text file and save
-    f_inputs = 'Inputs: \n Collision Frequency nu_c: ' + str(nu) + '\n B_perp: '\
+    f_inputs = 'Inputs: \n Collision Frequency ν_c: ' + str(nu)\
+               + '\n Alfven frequency ω_A: ' + str(omega_A)\
+               + '\n ν_c / ω_A: ' + str(nu/omega_A) + '\n B_prp: '\
                + str(B_prp) + '\n Inital Pressure p_0: ' + str(p_0) + '\n \n'
     f_beta = 'β = ' + str(beta) + '\nδb = ' + str(db) + '\n√β = ' + str(np.sqrt(beta))\
-             + '\nδb_int = ' + str(db_int) + '\n'
+             + '\nδb_int = ' + str(db_int) + '\nLy / Lx = ' + str(Ly) + '/' + str(Lx) + '\n'
     f_regime = '\nPlasma is in the ' + diag.REGIMES[regime] + ' regime \n'
     f_interrupt = 'Waves ' + interrupt_limit + ' be interrupted.'
     f_string = f_inputs + f_beta + f_regime + f_interrupt
-    f_string
-    # change to fname, implement
-    with open(diag.PATH + output + '/' + fname + '.txt', 'w') as f:
+    file_path = diag.PATH + output + '/analysis'
+    diag.make_folder(file_path)
+    with open(file_path + '/' + fname + '.txt', 'w') as f:
         f.write(f_string)

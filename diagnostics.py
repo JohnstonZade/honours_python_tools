@@ -7,19 +7,21 @@ import pickle
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-import seaborn as sns
+# import seaborn as sns
+from pathlib import Path
 from athena_read import athdf, hst
 from math import pi
 from matplotlib import rc
 
 rc('text', usetex=True)  # LaTeX labels
 # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
-PATH = '/media/zade/STRONTIUM/honours_project_2020/'
+PATH = '/data/johza721/honours_project_2020/'
 DICT_PATH = PATH + 'pickle/'
-REGIMES = ['collisionless', 'braginskii with heat fluxes', 'braginskii']
+REGIMES = ['Collisionless', 'Braginskii with heat fluxes', 'Braginskii']
+DEFAULT_PROB = 'shear_alfven'
 
 
-def load_data(fname, n, prob='Turb'):
+def load_data(fname, n, prob=DEFAULT_PROB):
     '''Loads data from .athdf files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -34,7 +36,7 @@ def load_data(fname, n, prob='Turb'):
     return athdf(filename)
 
 
-def load_hst(fname, prob='Turb'):
+def load_hst(fname, prob=DEFAULT_PROB):
     '''Loads data from .hst files output from Athena++, using modules
     from the athena_read code.
     '''
@@ -69,7 +71,8 @@ def check_dict(fname):
 
 def make_folder(fname):
     if not os.path.exists(fname):
-        os.mkdir(fname)
+        path = Path(fname)
+        path.mkdir(parents=True, exist_ok=True)
 
 
 def get_maxn(fname):
@@ -109,7 +112,7 @@ def get_vec(v, p):
     return np.array([v1, v2, v3])
 
 
-def get_vol(fname, prob='Turb'):
+def get_vol(fname, prob=DEFAULT_PROB):
     data = load_data(fname, 0, prob)
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
@@ -183,7 +186,7 @@ def plot_energy_evo(fname, plot_title='test'):
 # --- DIMENSIONLESS PARAMETER CALCULATIONS --- #
 
 
-def It_Brag(fname, nu_c, prob='Turb'):
+def It_Brag(fname, nu_c, prob=DEFAULT_PROB):
     '''Code to calculate the It_Brag parameter as described in Jono's
     magneto-immutable turbulence paper. ρ and v_A are assumed to be 1.
     Relavant regimes:
@@ -232,7 +235,7 @@ def calc_omega_A(Lx):
     # Then k_∥ = 2π/Lx and ω_A = k_∥v_A = 2π/Lx
     return 2*np.pi / Lx
 
-def avg_B(fname, n, background, prob='Turb'):
+def avg_B(fname, n, background, prob=DEFAULT_PROB):
     data = load_data(fname, n, prob)
     return avg_B_data(data, background)
 
