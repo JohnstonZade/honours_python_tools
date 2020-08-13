@@ -7,6 +7,7 @@ import diagnostics as diag
 rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
+
 def generate_points(grid, N):
     '''Generate N pairs of random points on the grid. Biased towards generating
     points that are closer together.
@@ -134,7 +135,7 @@ def plot_struct(l_grid, v_avg, t, fname):
     plt.clf()
 
 
-def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=defualt_prob):
+def structure_function(fname, n, do_mhd=1, N=1e6, do_ldist=0, prob=default_prob):
     '''Calculates and plots structure function.'''
 
     def get_length():

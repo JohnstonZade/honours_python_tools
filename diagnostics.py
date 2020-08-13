@@ -16,7 +16,6 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 # PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
 PATH = '/media/zade/STRONTIUM/honours_project_2020/'
-DICT_PATH = PATH + 'pickle/'
 REGIMES = ['collisionless', 'braginskii with heat fluxes', 'braginskii']
 DEFAULT_PROB = 'shear_alfven'
 
@@ -44,29 +43,29 @@ def load_hst(fname, prob=DEFAULT_PROB):
     return hst(hstLoc)
 
 
-def load_dict(fname=''):
-    file = 'S_dict.pkl'
+def load_dict(output, fname=''):
+    file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    pkl_file = open(DICT_PATH+file, 'rb')
+    pkl_file = open(PATH+output+file, 'rb')
     dict = pickle.load(pkl_file)
     pkl_file.close()
     return dict
 
 
-def save_dict(dict, fname=''):
-    file = 'S_dict.pkl'
+def save_dict(dict, output, fname=''):
+    file = 'dict.pkl'
     if fname != '':
         file = fname + '_' + file
 
-    output = open(DICT_PATH+file, 'wb')
+    output = open(PATH+output+file, 'wb')
     pickle.dump(dict, output)
     output.close()
 
 
-def check_dict(fname):
-    return os.path.isfile(DICT_PATH+fname+'_S_dict.pkl')
+def check_dict(output, fname):
+    return os.path.isfile(PATH+output+fname+'_dict.pkl')
 
 
 def make_folder(fname):
@@ -119,6 +118,97 @@ def get_vol(fname, prob=DEFAULT_PROB):
     X3 = data['RootGridX3'][1] - data['RootGridX3'][0]
     return abs(X1*X2*X3)  # just a check to make volume positive
 
+
+# --- Δp STATISTICS --- #
+def box_averaged_dp(fname, prob=DEFAULT_PROB):
+    max_n = get_maxn(fname)
+    t, dp, dp_std = [], [], []
+
+    for n in range(max_n):
+        data = load_data(fname, n, prob=prob)
+        t.append(data['Time'])
+
+        dp_data = (data['pprp'] - data['pprl'])
+        dp_avg = np.mean(dp_data)  # box averaged dp
+        dp_std.append(np.std(dp_data))
+
+        B2 = get_B2(fname, n, prob=prob)
+        B2_avg = np.mean(B2)
+
+        dp_per_B2_avg = dp_avg / B2_avg  # not different from mean(dp/B2)
+        dp.append(dp_per_B2_avg)
+    t = np.array(t)
+    dp = np.array(dp)
+    dp_std = np.array(dp_std)
+    return t, dp, dp_std
+
+
+def dp_pdf(fname, n, prob=DEFAULT_PROB, do_plot=0):
+    # get delta p, nu_c and p_0 to calculate bb:grad u
+    data = load_data(fname, n, prob=prob)
+    # Perpendicular and parallel pressures
+    Δp = (data['pprp'] - data['pprl']).flatten()
+    B2 = get_B2(fname, n, zyx=1, prob=prob)
+    dp_per_B2 = Δp/B2
+    t = str(data['Time'])
+
+    n, bins = np.histogram(dp_per_B2, 100, density=True)
+    if do_plot:
+        # plot histogram
+        plt.plot(0.5*(bins[:-1] + bins[1:]), n)
+        plt.yscale('log', nonposy='clip')
+        plt.xlim(-1.05, 0.55)
+        plt.title(r'PDF of $4\pi\Delta p / B^2$, $t = $ ' + t)
+        plt.xlabel(r'$4\pi\Delta p / B^2$')
+        plt.ylabel(r'$\mathcal{P}$')
+        plt.show()
+        # plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdfnum.pdf')
+    else:
+        return n, bins
+
+
+def get_B2(fname, n, zyx=0, prob=DEFAULT_PROB):
+    init_data = load_data(fname, 0, prob)  # data at inital time
+    grid = init_data['RootGridSize'][::-1]  # rearranging to (z, y, x)
+    # for loading data into points on the grid
+    points = pnts(grid)
+
+    data = load_data(fname, n, prob=prob)
+    if zyx:
+        B_data = (data['Bcc3'], data['Bcc2'], data['Bcc1'])
+    else:
+        B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
+
+    # Magnitude squared of B
+    B_vector = np.array([get_vec(B_data, p) for p in points])
+    return get_mag(B_vector)**2
+
+
+def avg_over_k(arr, theta, n, dy, xyz=0):
+    '''# Function to return a 1D vector along the x-axis
+    averaged over the y-axis of a 2D simulation if theta = 0, else along
+    the direction perpendicular to the wavevector.
+    xyz=True if vectors are arranged in the form B(x,y,z)
+    xyz=False if arranged B(z,y,x) (Athena standard)
+    '''
+    arr_slice = arr[:, 0, 0] if xyz else arr[0, 0, :]
+    avg_arr = np.zeros_like(arr_slice)
+
+    if theta == 0.0:
+        for i in range(n):
+            avg_arr += arr[:, i, 0] if xyz else arr[0, i, :]
+        avg_arr /= n
+        return avg_arr
+    # elif theta == 90.0:
+        # average over x
+    else:
+        # for i in range(n):
+        #     arr_y = arr[0, i*dy, :]  # slice along fixed y
+        #     arr_y_roll = np.roll(arr_y, i*dy)  # rolling forward phase
+        #     avg_arr += arr_y_roll
+        # avg_arr /= n
+        avg_arr = arr[0, 0, :]  # return y=0 slice
+        return avg_arr
 
 # --- RMS FUNCTIONS  --- #
 
@@ -201,7 +291,7 @@ def db_int(nu_c, omega_A, beta):
 
 
 def find_regime(nu_c, omega_A, beta):
-    eta =  nu_c / omega_A
+    eta = nu_c / omega_A
     if eta < 1:
         return 0  # collisionless
     elif eta < np.sqrt(beta):

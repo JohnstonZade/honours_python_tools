@@ -43,7 +43,12 @@ def get_energy_data(output_dir,
                     B0=1.0,
                     Lx=1.0):
     hstData = diag.load_hst(output_dir, prob)
-    vol = diag.get_vol(output_dir, prob) if volume is None else volume
+    if prob == 'turb':
+        vol = 1  # Athena already takes this into account for the turbulent sim
+    elif volume is None:
+        vol = diag.get_vol(output_dir, prob)
+    else:
+        vol = volume
     t_A = Lx  # true when v_A = 1 and B0 along the x axis
     t = hstData['time'] / t_A  # scale by Alfven period
     KE = (hstData['1-KE'] + hstData['2-KE'] + hstData['3-KE']) / vol  # kinetic
