@@ -1,1 +1,1 @@
-git add *.py animate/ README.md __pycache__/
+git add *.py README.md
