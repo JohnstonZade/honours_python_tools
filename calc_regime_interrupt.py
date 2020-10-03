@@ -3,18 +3,12 @@ import diagnostics as diag
 default_prob = diag.DEFAULT_PROB
 
 
-def calculate(output, fname, nu_c, dedt, amp, p_0,
+def calculate(output_dir, save_dir, fname, nu_c, dedt, amp, p_0,
               Lx=1.0,
               prob=default_prob,
               vel_pert=0):
     assert nu_c >= 0, 'nu should be non-negative'
-    # assuming ω_A is always set to 1
-    # and assuming a sinusoidal perturbation in the z-direction to a magnetic
-    # field in the xy plane. Only for 2D waves
-
-    # Average of background field initially
-    # Just B0 for shear alfven case but will keep for more general turbulence
-    B_0 = diag.avg_B(output, 0, 1, prob)
+    B_0 = 1.0  # diag.avg_B(output_dir, 0, 1, prob)
     beta = diag.beta(p_0, B_0)  # beta = 2p/B^2 (Gaussian units)
     db = amp/B_0
     omega_A = diag.calc_omega_A(Lx)
@@ -35,14 +29,17 @@ def calculate(output, fname, nu_c, dedt, amp, p_0,
     f_string = f_inputs + f_beta + f_regime + f_interrupt
 
     # saving
-    with open(diag.PATH + output + '/' + fname + '.txt', 'w') as f:
+    if save_dir[-1] != '/':
+        save_dir += '/'
+
+    with open(diag.PATH + save_dir + fname + '.txt', 'w') as f:
         f.write(f_string)
-    save_to_dictionary(output, fname, nu_c, omega_A, amp, p_0, beta, db,
+    save_to_dictionary(output_dir, save_dir, fname, nu_c, omega_A, amp, p_0, beta, db,
                        db_int, regime)
 
 
-def save_to_dictionary(output, fname, nu_c, ω_A, amp, p_0, beta, db, db_int,
-                       regime):
+def save_to_dictionary(output_dir, save_dir, fname, nu_c, ω_A, amp, p_0, beta,
+                       db, db_int, regime):
     params = {}
     params['collision_freq'] = nu_c
     params['alfven_freq'] = ω_A
@@ -53,7 +50,24 @@ def save_to_dictionary(output, fname, nu_c, ω_A, amp, p_0, beta, db, db_int,
     params['db_int'] = db_int
     params['regime'] = regime
 
-    if output[-1] != '/':
-        output += '/'
+    if save_dir[-1] != '/':
+        save_dir += '/'
 
-    diag.save_dict(params, output, fname)
+    diag.save_dict(params, save_dir, fname)
+
+
+def quick_calc(nu_c, p_0, dedt, B_0=1.0, Lx=1.0):
+    amp = 2*np.sqrt(dedt)  # via critical balance
+
+    beta = diag.beta(p_0, B_0)  # beta = 2p/B^2 (Gaussian units)
+    db = amp/B_0
+    omega_A = diag.calc_omega_A(Lx)
+    regime = diag.REGIMES[diag.find_regime(nu_c, omega_A, beta)]
+    db_int = diag.db_int(nu_c, omega_A, beta)
+    interrupt_limit = 'will' if db >= db_int else 'will not'
+
+    print(regime)
+    print('β = ' + str(beta))
+    print('db = ' + str(db))
+    print('db_int = ' + str(db_int))
+    print('Waves ' + interrupt_limit + ' be interrupted.')

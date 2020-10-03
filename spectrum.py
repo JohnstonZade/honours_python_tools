@@ -1,5 +1,5 @@
 '''Code to calculate the energy spectrum of turbulence
-   in a fluid simulation.
+   in a fluid simulation run in Athena++.
 '''
 import numpy as np
 import numpy.fft as fft
@@ -9,19 +9,20 @@ from matplotlib import rc
 rc('text', usetex=True)  # LaTeX labels
 default_prob = diag.DEFAULT_PROB
 
-def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
+
+def calc_spectrum(output_dir, save_dir, fname, prob=default_prob,
+                  plot_title='test', do_mhd=1, do_title=1):
 
     # Getting turnover time and converting to file number
-    # As for the moment only simulating continuously forced turbulence,
-    # will start from halfway through the sim to the end.
-    max_n = diag.get_maxn(fname)
+    max_n = diag.get_maxn(output_dir)
     tau_file = int(max_n/2)
-    nums = range(tau_file, max_n)
-    do_full_calc = not diag.check_dict(fname)
+    nums = range(0, tau_file)  # average over first 2 alfven periods
+    # nums = range(tau_file, max_n) # average over last 2 alfven periods
+
+    do_full_calc = not diag.check_dict(save_dir)
     if do_full_calc:
         # create grid of K from first time step
-
-        data = diag.load_data(fname, tau_file, prob)
+        data = diag.load_data(output_dir, 0, prob=prob)
         (KX, KY, KZ), kgrid = diag.ft_grid(data, 1)
         Kprl = np.abs(KX)
         Kperp = np.sqrt(np.abs(KY)**2 + np.abs(KZ)**2)
@@ -30,8 +31,8 @@ def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
 
         # Dictionary to hold spectrum information
         S = {}
-        S['Nk'] = len(kgrid) - 1
-        S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])
+        S['Nk'] = len(kgrid) - 1  # number of elements in kgrid
+        S['kgrid'] = 0.5*(kgrid[:-1] + kgrid[1:])  # average of neighbours
 
         # Count the number of modes in each bin to normalize later -- this
         # gives a smoother result, as we want the average energy in each bin.
@@ -45,7 +46,7 @@ def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
         def m3(a):
             return np.mean(np.mean(np.mean(a)))
 
-        ns = 0
+        ns = 0  # counter
         fields = ['vel1', 'vel2', 'vel3', 'Bcc1', 'Bcc2', 'Bcc3',
                   'EK', 'EM', 'B', 'rho']
 
@@ -55,7 +56,7 @@ def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
 
         for n in nums:
             try:
-                data = diag.load_data(fname, n)
+                data = diag.load_data(output_dir, n, prob=prob)
             except IOError:
                 print('Could not load file', n)
                 break
@@ -63,6 +64,9 @@ def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
             if ns % 10 == 0:
                 print('Doing n =', n)
 
+            # Take the Fourier transform of the individual components
+            # Find their energy (ia Parseal's theorem)
+            # Add to total energy spectrum
             for vel in fields[:3]:
                 ft = fft.fftn(data[vel])
                 S[vel] += spect1D(ft, ft, Kspec, kgrid)
@@ -90,27 +94,49 @@ def calc_spectrum(fname, prob=default_prob, plot_title='test', do_mhd=1):
             S[var] /= ns
         S['nums'] = nums
 
-        diag.save_dict(S, fname)
+        diag.save_dict(S, save_dir)
     else:
-        S = diag.load_dict(fname)
+        S = diag.load_dict(save_dir, 'mhd')
 
-    plot_spectrum(S, fname, plot_title, do_mhd)
+    plot_spectrum(S, save_dir, fname, plot_title, do_mhd, do_title=do_title)
 
 
-def plot_spectrum(S, fname, plot_title, do_mhd=1):
+def plot_spectrum(S, save_dir, fname, plot_title, do_mhd=1, do_title=1,
+                  plot_show=0, k_line_mod=0, k_params=None):
     # plot spectrum
     if do_mhd:
-        plt.loglog(S['kgrid'][1:], S['EK'][1:], S['kgrid'][1:], S['EM'][1:],
-                   S['kgrid'], S['kgrid']**(-5/3), ':')
-        plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$'])
+        x = S['kgrid'][1:]
+        if k_line_mod:
+            x_mask = np.logical_and(k_params[0] < x, x < k_params[1])
+            x_mod = x[x_mask]
+            x53 = k_params[2] * (x_mod/k_params[0])**(-5/3)
+            x3 = k_params[3] * (x_mod/k_params[0])**(-3)
+            plt.loglog(x, S['EK'][1:], x, S['EM'][1:],
+                       x_mod, x53, ':', x_mod, x3, ':')
+        else:
+            x53 = x**(-5/3) * 10**(2)
+            x3 = x**(-3) * 10**(4.7)
+            plt.loglog(x, S['EK'][1:], x, S['EM'][1:],
+                       x, x53, ':',
+                       x, x3, ':')
+        plt.legend([r'$E_K$', r'$E_B$', r'$k^{-5/3}$', r'$k^{-3}$'])
     else:
         plt.loglog(S['kgrid'], S['EK'], S['kgrid'], S['kgrid']**(-5/3), ':')
         plt.legend([r'$E_K$', r'$k^{-5/3}$'])
     plt.xlabel(r'$k$')
-    plt.ylabel(r'$E_K$')
-    plt.title('Energy  Spectrum: ' + plot_title)
-    plt.savefig(diag.PATH + fname + '/' + fname.split()[-1] + '_spec.png')
-    plt.clf()
+    plt.ylabel(r'$E(k)$')
+    if do_title:
+        plt.title('Energy  Spectrum: ' + plot_title)
+
+    if diag.PATH not in save_dir:
+        save_dir = diag.PATH + save_dir
+
+    if plot_show:
+        plt.show()
+    else:
+        plt.savefig(save_dir + fname + '_spec.pdf')
+        plt.savefig(save_dir + fname + '_spec.png')
+        plt.close()
 
 
 def spect1D(v1, v2, K, kgrid):
@@ -126,35 +152,3 @@ def spect1D(v1, v2, K, kgrid):
         sum = np.sum(np.real(v1[mask])*np.conj(v2[mask]))
         out[k] = np.real(sum) / NT2
     return out
-
-
-# TODO: work on making more general, check against MATLAB
-def get_turnover_time(fname, do_decay):
-    hstData = diag.load_hst(fname)
-    KEx, KEy, KEz = hstData['1-KE'], hstData['2-KE'], hstData['3-KE']
-
-    u_L = 0.
-    if do_decay:
-        u_L = np.sqrt(2*(KEx[1]+KEy[1]+KEz[1]))
-    else:
-        n = 0
-        for f in range(100, 3001):
-            try:
-                u_L += np.sqrt(2*(KEx[f]+KEy[f]+KEz[f]))
-                n += 1
-            except IndexError:
-                print('No entry at', f)
-                break
-            u_L /= n
-    u_L
-    tau = 1 / u_L
-    tau_file = int(tau)
-
-    tau_file = 10
-
-    if do_decay:
-        nums = range(tau_file, 301)
-    else:
-        nums = range(tau_file, 6*tau_file+1)
-
-    return tau_file, nums

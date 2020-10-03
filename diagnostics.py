@@ -1,5 +1,5 @@
-'''Code to calculate diagnostics such as root mean square and probability
-   density functions for fluid simulations.
+'''
+Code to calculate diagnostics for fluid simulations.
 '''
 import glob
 import os
@@ -7,40 +7,44 @@ import pickle
 import numpy as np
 import numpy.fft as fft
 import matplotlib.pyplot as plt
-# import seaborn as sns
 from pathlib import Path
-from athena_read import athdf, hst
+from athena_read import athdf, athinput, hst
 from math import pi
 from matplotlib import rc
-
 rc('text', usetex=True)  # LaTeX labels
-# PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
-PATH = '/media/zade/STRONTIUM/honours_project_2020/'
+
+# Path to simulation data
+PATH = '/media/zade/Seagate Expansion Drive/honours_project_2020/'
+# PATH = '/media/zade/STRONTIUM/honours_project_2020/'
 REGIMES = ['collisionless', 'braginskii with heat fluxes', 'braginskii']
 DEFAULT_PROB = 'shear_alfven'
 
 
-def load_data(fname, n, prob=DEFAULT_PROB):
-    '''Loads data from .athdf files output from Athena++, using modules
-    from the athena_read code.
+def load_data(output_dir, n, prob=DEFAULT_PROB):
+    '''Loads data from .athdf files output from Athena++.
     '''
 
     def f(n):
         return folder + '.out' + output_id + '.%05d' % n + '.athdf'
 
     # Input
-    folder = PATH + fname + '/' + prob  # Name of output
+    folder = PATH + output_dir + '/' + prob  # Name of output
     output_id = '2'  # Output ID (set in input file)
     filename = f(n)
     return athdf(filename)
 
 
-def load_hst(fname, prob=DEFAULT_PROB):
-    '''Loads data from .hst files output from Athena++, using modules
-    from the athena_read code.
+def load_hst(output_dir, prob=DEFAULT_PROB):
+    '''Loads data from .hst files output from Athena++.
     '''
-    hstLoc = PATH + fname + '/' + prob + '.hst'
+    hstLoc = PATH + output_dir + '/' + prob + '.hst'
     return hst(hstLoc)
+
+
+def load_athinput(athinput_path):
+    '''Loads data from athinput files.
+    '''
+    return athinput(PATH + athinput_path)
 
 
 def load_dict(output, fname=''):
@@ -64,8 +68,11 @@ def save_dict(dict, output, fname=''):
     output.close()
 
 
-def check_dict(output, fname):
-    return os.path.isfile(PATH+output+fname+'_dict.pkl')
+def check_dict(output, fname=''):
+    file = 'dict.pkl'
+    if fname != '':
+        file = fname + '_' + file
+    return os.path.isfile(PATH+output+file)
 
 
 def make_folder(fname):
@@ -75,19 +82,12 @@ def make_folder(fname):
 
 
 def get_maxn(fname):
+    '''Gets the total number of simulation timesteps.
+    '''
     return len(glob.glob(PATH+fname+'/*.athdf'))
 
 
 # --- VECTOR FUNCTIONS --- #
-
-
-def pnts(p):
-    points = []
-    for zz in range(p[0]):
-        for yy in range(p[1]):
-            for xx in range(p[2]):
-                points.append((zz, yy, xx))
-    return np.array(points)
 
 
 def get_mag(X):
@@ -112,6 +112,7 @@ def get_vec(v, p):
 
 
 def get_vol(fname, prob=DEFAULT_PROB):
+    '''Returns the volume of the simulation domain.'''
     data = load_data(fname, 0, prob)
     X1 = data['RootGridX1'][1] - data['RootGridX1'][0]
     X2 = data['RootGridX2'][1] - data['RootGridX2'][0]
@@ -120,39 +121,69 @@ def get_vol(fname, prob=DEFAULT_PROB):
 
 
 # --- Δp STATISTICS --- #
-def box_averaged_dp(fname, prob=DEFAULT_PROB):
+
+
+def get_time_vec(fname, prob=DEFAULT_PROB):
     max_n = get_maxn(fname)
-    t, dp, dp_std = [], [], []
+    hst_data = load_hst(fname, prob=prob)
+    t = hst_data['time']
+    dt = t[1] - t[0]  # hst dt
+    dt_big = t[-1]/(max_n-1)  # actual data dt
+    step = int(round(dt_big / dt))
+    t = t[::step]
+    return np.array(t)
+
+
+def box_averaged_dp(fname, prob=DEFAULT_PROB):
+    '''
+    Averages the quantity Δp over the simulation domain.
+    '''
+    max_n = get_maxn(fname)
+    t = get_time_vec(fname, prob=prob)
+    dp, dp_std = [], []
 
     for n in range(max_n):
         data = load_data(fname, n, prob=prob)
-        t.append(data['Time'])
 
         dp_data = (data['pprp'] - data['pprl'])
         dp_avg = np.mean(dp_data)  # box averaged dp
         dp_std.append(np.std(dp_data))
 
-        B2 = get_B2(fname, n, prob=prob)
+        B2 = data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2
         B2_avg = np.mean(B2)
 
         dp_per_B2_avg = dp_avg / B2_avg  # not different from mean(dp/B2)
         dp.append(dp_per_B2_avg)
-    t = np.array(t)
     dp = np.array(dp)
     dp_std = np.array(dp_std)
     return t, dp, dp_std
 
 
-def dp_pdf(fname, n, prob=DEFAULT_PROB, do_plot=0):
-    # get delta p, nu_c and p_0 to calculate bb:grad u
+def dp_pdf(fname, n, prob=DEFAULT_PROB, scale_by_urms=0, do_plot=0):
+    '''
+    Calculates the PDF of the quantity Δp over the simulation domain
+    at a given time.
+    '''
     data = load_data(fname, n, prob=prob)
     # Perpendicular and parallel pressures
-    Δp = (data['pprp'] - data['pprl']).flatten()
-    B2 = get_B2(fname, n, zyx=1, prob=prob)
-    dp_per_B2 = Δp/B2
+    dp = data['pprp'] - data['pprl']
+    B2 = data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2
+    dp_per_B2 = dp / B2
+
+    if scale_by_urms:
+        u_mag_2 = data['vel1']**2 + data['vel2']**2 + data['vel3']**2
+        u_rms = np.sqrt(np.mean(u_mag_2))
+        dp_per_B2 /= u_rms
+
     t = str(data['Time'])
 
-    n, bins = np.histogram(dp_per_B2, 100, density=True)
+    # to stop big spikes at the limiters, modified such that it takes into
+    # account scaling by u_rms
+    if scale_by_urms:
+        range = (np.amin(dp_per_B2) + 0.1, np.amax(dp_per_B2) - 0.1)
+    else:
+        range = (-0.99, 0.499)
+    n, bins = np.histogram(dp_per_B2, bins=400, range=range, density=True)
     if do_plot:
         # plot histogram
         plt.plot(0.5*(bins[:-1] + bins[1:]), n)
@@ -162,122 +193,141 @@ def dp_pdf(fname, n, prob=DEFAULT_PROB, do_plot=0):
         plt.xlabel(r'$4\pi\Delta p / B^2$')
         plt.ylabel(r'$\mathcal{P}$')
         plt.show()
-        # plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdfnum.pdf')
     else:
         return n, bins
 
 
-def get_B2(fname, n, zyx=0, prob=DEFAULT_PROB):
-    init_data = load_data(fname, 0, prob)  # data at inital time
-    grid = init_data['RootGridSize'][::-1]  # rearranging to (z, y, x)
-    # for loading data into points on the grid
-    points = pnts(grid)
-
-    data = load_data(fname, n, prob=prob)
-    if zyx:
-        B_data = (data['Bcc3'], data['Bcc2'], data['Bcc1'])
-    else:
-        B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
-
-    # Magnitude squared of B
-    B_vector = np.array([get_vec(B_data, p) for p in points])
-    return get_mag(B_vector)**2
-
-
-def avg_over_k(arr, theta, n, dy, xyz=0):
-    '''# Function to return a 1D vector along the x-axis
-    averaged over the y-axis of a 2D simulation if theta = 0, else along
-    the direction perpendicular to the wavevector.
-    xyz=True if vectors are arranged in the form B(x,y,z)
-    xyz=False if arranged B(z,y,x) (Athena standard)
+def get_bbgu(data):
     '''
-    arr_slice = arr[:, 0, 0] if xyz else arr[0, 0, :]
-    avg_arr = np.zeros_like(arr_slice)
+    Calculates the quantity bb:∇u at every point within the simulation domain.
+    '''
+    # Uses Fourier transform equivalent ∂_i u_j ↔ k_i 𝓕[u_j]
+    def grad_u(K, u, i, j):
+        return np.real(fft.ifftn(K[i]*fft.fftn(u[j])))
 
-    if theta == 0.0:
-        for i in range(n):
-            avg_arr += arr[:, i, 0] if xyz else arr[0, i, :]
-        avg_arr /= n
-        return avg_arr
-    # elif theta == 90.0:
-        # average over x
+    def bbgu_calc(b, du, i, j):
+        return b[i, :]*b[j, :] * du[i, j, :]
+
+    def bbgu(b, du):
+        sums = range(3)
+        bbgu_elements = np.array([[bbgu_calc(b, du, i, j) for i in sums]
+                                  for j in sums])
+        return sum(bbgu_elements[i, j, :] for i in sums for j in sums)
+
+    K = ft_grid(data, 0)[::-1]  # Kx Ky Kz
+    u = (data['vel1'], data['vel2'], data['vel3'])
+
+    sums = range(3)
+    du = np.array([[grad_u(K, u, i, j) for j in sums]
+                   for i in sums])
+
+    B_vec = np.array([data['Bcc1'], data['Bcc2'], data['Bcc3']])
+    B_mag = np.sqrt(data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2)
+    b = B_vec / B_mag
+
+    return bbgu(b, du)
+
+
+def box_averaged_bbgu(fname, prob=DEFAULT_PROB):
+    '''
+    Averages the quantity bb:∇u over the simulation domain.
+    '''
+    max_n = get_maxn(fname)
+    t = get_time_vec(fname, prob=prob)
+    bbgu, bbgu_std = [], []
+
+    for n in range(max_n):
+        data = load_data(fname, n, prob=prob)
+
+        bbgu_data = get_bbgu(data)
+        bbgu_avg = np.mean(bbgu_data)  # box averaged dp
+        bbgu_std.append(np.std(bbgu_data))
+
+        B2 = data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2
+        B2_avg = np.mean(B2)
+
+        bbgu_per_B2_avg = bbgu_avg / B2_avg  # not different from mean(dp/B2)
+        bbgu.append(bbgu_per_B2_avg)
+    bbgu = np.array(bbgu)
+    bbgu_std = np.array(bbgu_std)
+    return t, bbgu, bbgu_std
+
+
+def bbgu_pdf(fname, n, prob=DEFAULT_PROB, scale_by_urms=0, do_plot=0,
+             dp_scale=0,
+             scale_by_B2=1,
+             regime=None,
+             nu_c=None,
+             p0=None):
+    '''
+    Calculates the PDF of the quantity bb:∇u over the simulation domain
+    at a given time.
+    '''
+    data = load_data(fname, n, prob=prob)
+    bbgu = get_bbgu(data)
+
+    if scale_by_B2:
+        B2 = data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2
+        bbgu_per_B2 = bbgu / B2
     else:
-        # for i in range(n):
-        #     arr_y = arr[0, i*dy, :]  # slice along fixed y
-        #     arr_y_roll = np.roll(arr_y, i*dy)  # rolling forward phase
-        #     avg_arr += arr_y_roll
-        # avg_arr /= n
-        avg_arr = arr[0, 0, :]  # return y=0 slice
-        return avg_arr
+        bbgu_per_B2 = bbgu
 
-# --- RMS FUNCTIONS  --- #
+    if scale_by_urms:
+        u_mag_2 = data['vel1']**2 + data['vel2']**2 + data['vel3']**2
+        u_rms = np.sqrt(np.mean(u_mag_2))
+        bbgu_per_B2 /= u_rms
+    if dp_scale:
+        if 'braginskii' in regime:
+            bbgu_per_B2 *= p0 / nu_c
+        elif regime == 'collisionless':
+            bbgu_per_B2 *= (data['pprp'] + 2*data['pprl'])/(2*np.pi)
 
+    t = str(data['Time'])
 
-# FIX: Find a way to get perpendicular vector components
-# Assumes that B_0 is always in the x-direction
-def get_rms(fname, n, do_mhd):
-    data = load_data(fname, n)
-    t = data['Time']
-
-    # Get perpendicular direction from initial conditions?
-    vy, vz = data['vel2'], data['vel3']
-    vel_perp_2 = (vy-np.mean(vy))**2 + (vz-np.mean(vz))**2
-    if do_mhd:
-        By, Bz = data['Bcc2'], data['Bcc3']
-        B_perp_2 = (By-np.mean(By))**2 + (Bz-np.mean(Bz))**2
+    if dp_scale:
+        range = (-0.99, 0.49)
     else:
-        B_perp_2 = [0]
+        range = (-15.0, 15.0)
+    n, bins = np.histogram(bbgu_per_B2, bins=400, range=range, density=True)
+    if do_plot:
+        # plot histogram
+        plt.plot(0.5*(bins[:-1] + bins[1:]), n)
+        plt.yscale('log', nonposy='clip')
+        plt.xlim(-1.05, 0.55)
+        bbgu_string = r'$4\pi\hat{\mathbf{b}}\hat{\mathbf{b}}:\nabla\mathbf{u}/B^2$'
+        plt.title(r'PDF of ' + bbgu_string + ', $t = $ ' + t)
+        plt.xlabel(bbgu_string)
+        plt.ylabel(r'$\mathcal{P}$')
+        plt.show()
+    else:
+        return n, bins
 
-    return t, np.sqrt(np.mean(vel_perp_2)), np.sqrt(np.mean(B_perp_2))
+
+def avg_B(fname, n, background, prob=DEFAULT_PROB):
+    data = load_data(fname, n, prob)
+    return avg_B_data(data, background)
 
 
-def plot_rms(fname, do_mhd=1):
-    n_max = get_maxn(fname)
+def avg_B_data(data, background):
+    B_mag = np.sqrt(data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2)
+    B_avg = np.mean(B_mag)
+    return B_avg
 
-    T, V, B = [], [], []
-    for i in range(n_max):
-        t, v_rms, b_rms = get_rms(fname, i, do_mhd)
-        T.append(t)
-        V.append(v_rms)
-        B.append(b_rms)
 
-    plt.plot(T, V, T, B)
-    plt.plot(T, np.mean(V)*np.ones(len(T)), ':',
-             T, np.mean(B)*np.ones(len(T)), ':')
-    plt.title('Time Evolution of Perpendicular Fluctuations (RMS)')
-    plt.xlabel('Time (s)')
-    plt.ylabel(r'$\delta_{\perp \textrm{, rms}}$')
-    plt.legend([r'$\delta u_{\perp}$', r'$\delta B_{\perp}$',
-                r'$\delta u_{\perp}$ mean', r'$\delta B_{\perp}$ mean'])
-    plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_fluc.pdf')
-    plt.clf()
+def get_B2(fname, n, prob=DEFAULT_PROB):
+    data = load_data(fname, n, prob=prob)
+    B2 = data['Bcc1']**2 + data['Bcc2']**2 + data['Bcc3']**2
+    return B2
 
 
 # --- DIMENSIONLESS PARAMETER CALCULATIONS --- #
 
 
-def It_Brag(fname, nu_c, prob=DEFAULT_PROB):
-    '''Code to calculate the It_Brag parameter as described in Jono's
-    magneto-immutable turbulence paper. ρ and v_A are assumed to be 1.
-    Relavant regimes:
-        It_Brag < 1 ⟹ Δp ~ B^2
-        It_Brag > 1 ⟹ Δp ≪ B^2
-    '''
-    data = load_data(fname, 0, prob)
-    # length of box ∥ to B-field, assumed to be in x-direction
-    l_prl = abs(data['RootGridX1'][1] - data['RootGridX1'][0])
-    # length of box ⟂ to B-field, y- and z- lengths assumed to be the same.
-    l_prp = abs(data['RootGridX2'][1] - data['RootGridX2'][0])
-
-    # pprp and pprl are set to p_0 initially over the box
-    p_0 = data['pprp'][0, 0, 0]
-
-    # (δB⟂/B0) = (L⟂/L∥)
-    It = (l_prl*nu_c / p_0) * (l_prp / l_prl)**(-2)
-    return It
-
-
 def beta(p0, B0):
+    '''
+    Calculates the plasma beta β = thermal pressure / magnetic pressure.
+    Uses Athena++ units, where factors of √4π are absorbed into B.
+    '''
     return 2*p0/(B0**2)
 
 
@@ -295,9 +345,9 @@ def find_regime(nu_c, omega_A, beta):
     if eta < 1:
         return 0  # collisionless
     elif eta < np.sqrt(beta):
-        return 1  # brag with heat fluxes
+        return 1  # Braginskii with heat fluxes/weakly collisional
     else:
-        return 2  # brag
+        return 2  # Braginskii
 
 
 def calc_omega_A(Lx):
@@ -306,131 +356,37 @@ def calc_omega_A(Lx):
     return 2*np.pi / Lx
 
 
-def avg_B(fname, n, background, prob=DEFAULT_PROB):
-    data = load_data(fname, n, prob)
-    return avg_B_data(data, background)
-
-
-def avg_B_data(data, background):
-    grid = data['RootGridSize'][::-1]
-    points = pnts(grid)
-
-    if background:
-        # magnitude squared of the background magnetic field
-        # assuming perturbation is in the z direction
-        # this is true for Alfven waves with k and B0 in the xy plane
-        # as perturbation must be in the k×B0 = z direction
-        B_data = (data['Bcc1'], data['Bcc2'], np.zeros_like(data['Bcc3']))
-    else:
-        # average value of B2 over the whole region
-        B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
-    B_vec = np.array([get_vec(B_data, p) for p in points])
-    B_avg = np.mean(get_mag(B_vec))  # spatial average of B
-    return B_avg
-
-# --- bb:∇u PDF FUNCTIONS --- #
-
-
-def prlshear_pdf(fname, n, plot_title='', do_plot=1):
-    # pprp and pprl are set to p_0 initially over the box
-    p_0 = load_data(fname, 0)['pprp'][0, 0, 0]
-    # Convention: putting ν_c (nuc) value at end of file name
-    x = fname.rfind('nuc') + 3
-    ν_c = float(fname[x:])
-
-    # get delta p, nu_c and p_0 to calculate bb:grad u
-    data = load_data(fname, n)
-    # Perpendicular and parallel pressures
-    pprp = data['pprp']
-    pprl = data['pprl']
-    Δp = (pprp - pprl).flatten()
-
-    μ_Brag = p_0/ν_c
-    prlshear = Δp/μ_Brag  # bb:grad u
-
-    if do_plot:
-        n, bins, patches = plt.hist(prlshear, 100, density=True)
-        plt.clf()
-        # plot histogram
-        plt.plot(0.5*(bins[:-1] + bins[1:]), n)
-        plt.yscale('log', nonposy='clip')
-        plt.title(r'PDF of $\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
-                  + plot_title)
-        plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
-        plt.ylabel(r'$\mathcal{P}$')
-        plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdfnum.pdf')
-        plt.clf()
-    else:
-        return prlshear
-
-
-def prlshearft_pdf(fname, n, plot_title='', do_plot=1):
-
-    def dv(i, j):
-        '''Calculates gradient of the components of vel_data using FFT.'''
-        return np.real(fft.ifftn(K[i]*fft.fftn(vel_data[j])))
-
-    # ft stuff
-    data = load_data(fname, n)
-    points = pnts(data['RootGridSize'][::-1])
-
-    K = ft_grid(data, 0)[::-1]  # gets KX, KY, KZ
-    vel_data = (data['vel1'], data['vel2'], data['vel3'])
-    B_data = (data['Bcc1'], data['Bcc2'], data['Bcc3'])
-    B_vec = np.array([get_vec(B_data, p) for p in points])
-    b = get_unit(B_vec)
-    B2avg = np.mean(get_mag(B_vec)**2)  # spatial average of B^2
-
-    # Calculate bb:∇u = b_i b_j ∂_i u_j
-    # with ∂_i u_j = ifft(K_i fft(u_j))
-    # over all space
-    prlshear = 0
-    for i in range(3):
-        for j in range(3):
-            prlshear += b[:, i]*b[:, j]*dv(i, j).flatten()
-
-    if do_plot:
-        n, bins, patches = plt.hist(prlshear, 100, density=True)
-        plt.yscale('log', nonposy='clip')
-        plt.title(r'PDF (using Fourier method) of '
-                  + r'$\mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}$ with '
-                  + plot_title)
-        plt.xlabel(r'$4\pi \mathbf{\hat{b}\hat{b}}:\nabla\mathbf{u}/\langle B^2\rangle$')
-        plt.ylabel(r'$\mathcal{P}$')
-        plt.savefig(PATH + fname + '/' + fname.split()[-1] + '_dp_pdf.pdf')
-        plt.clf()
-    else:
-        return prlshear, B2avg
-
-
 # --- FOURIER FUNCTIONS --- #
 
 
 def ft_array(N):
-    '''For given N, returns an array conforming to FT standard:
+    '''
+    For given N, returns an array conforming to FT standard:
        [0 1 2 3 ... -N/2 -N/2+1 ... -1]
     '''
-    return np.concatenate((np.arange(1, N//2, 1), [-N//2],
+    return np.concatenate((np.arange(0, N//2, 1), [-N//2],
                            np.arange(-N//2+1, 0, 1)))
 
 
 def ft_grid(data, k_grid):
-    '''Creates a grid in k-space corresponding to the real grid given in data.
+    '''
+    Creates a grid in k-space corresponding to the real grid given in data.
     k_grid is a boolean that when True calculates a regularly spaced array
     in k-space.
     '''
+
     # Z, Y, X
     p = (data['x3f'], data['x2f'], data['x1f'])
     Ls = [np.max(p[0]), np.max(p[1]), np.max(p[2])]
-    Ns = [len(p[0]), len(p[1]), len(p[2])]
+    Ns = [len(p[0])-1, len(p[1])-1, len(p[2])-1]
 
     K = {}
     for k in range(3):
         K[k] = 2j*pi/Ls[k]*ft_array(Ns[k])
 
     # Outputs Z, Y, X
-    to_ret = np.meshgrid(K[0], K[1], K[2], indexing='ij')
+    Ks = np.meshgrid(K[0], K[1], K[2], indexing='ij')
     if k_grid:
-        to_ret = (to_ret, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
+        Ks = (Ks, np.arange(0, np.max(np.imag(K[1])), 2*pi/Ls[1]))
 
-    return to_ret
+    return Ks
