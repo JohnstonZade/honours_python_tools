@@ -41,11 +41,11 @@ def plot_dpdist_and_bbgudist(output_dir, a_save, fname, regime, nu_c, p0,
     for i, n in enumerate([20, 80]):  # t/τ_A = 1.0, 4.0
         t = '{:.2f}'.format(t_dp[n])  # scale by Alfven time
         dp_hist, bins = diag.dp_pdf(output_dir, n, prob=prob)
-        bbgu_hist, bb_bins = diag.bbgu_pdf(output_dir, n, prob=prob,
+        bbgu_hist = diag.bbgu_pdf(output_dir, n, prob=prob,
                                            dp_scale=1,
                                            regime=regime,
                                            nu_c=nu_c,
-                                           p0=p0)
+                                           p0=p0)[0]
 
         x = 0.5*(bins[:-1] + bins[1:])
 
@@ -78,7 +78,7 @@ def avg_dppdf_oneperiod(output_dir, a_save, fname,
     avg = 20
     n_hist, bins = diag.dp_pdf(output_dir, 20, prob=prob)
     for n in range(21, 41):
-        n_hist_temp, bins_temp = diag.dp_pdf(output_dir, n, prob=prob)
+        n_hist_temp = diag.dp_pdf(output_dir, n, prob=prob)[0]
         n_hist += n_hist_temp
     n_hist /= avg
     plt.semilogy(0.5*(bins[:-1] + bins[1:]), n_hist)
@@ -202,24 +202,6 @@ def plot_dp_time_evo(output_dir, fig_save, fname, regime, db, t, dp, dp_std,
 
     fig_save += fname
     fig_save += '_dp_mean'
-    plt.savefig(fig_save + '.pdf')
-    plt.savefig(fig_save + '.png')
-    plt.close()
-
-
-def plot_bbgu_time_evo(output_dir, fig_save, fname, prob='shear_alfven'):
-    t, bbgu, dB_dt = diag.mean_bbgu_vs_dtlnB(output_dir, prob)
-
-    plt.plot(t, bbgu, label=r'$\langle \hat{\mathbf{b}} \hat{\mathbf{b}} : \nabla \mathbf{u} \rangle$')
-    plt.plot(t, dB_dt, label=r'$\langle \frac{d}{dt} \ln B \rangle$')
-
-    plt.xlabel(r'$t/\tau_A$')
-    plt.title('Time Evolution')
-    plt.legend()
-    plt.grid()
-
-    fig_save += fname
-    fig_save += '_bbgu_mean'
     plt.savefig(fig_save + '.pdf')
     plt.savefig(fig_save + '.png')
     plt.close()
